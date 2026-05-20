@@ -50,6 +50,7 @@ const config: Config = {
         blush: "blush 2s ease-out",
         sway: "sway 5s ease-in-out infinite",
         floatUp: "floatUp 0.35s ease-out",
+        "spin-slow": "spin 7s linear infinite",
       },
       backdropBlur: {
         petal: "12px",
