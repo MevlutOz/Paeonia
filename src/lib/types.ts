@@ -17,6 +17,7 @@ export interface Message {
   createdAt: Timestamp | null;
   isRead: boolean;
   isRevealed: boolean;
+  isFavorited: boolean;
 }
 
 export interface MemoryPhoto {

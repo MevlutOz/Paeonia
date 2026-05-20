@@ -39,6 +39,7 @@ export function subscribeMessages(
         createdAt: data.createdAt ?? null,
         isRead: !!data.isRead,
         isRevealed: !!data.isRevealed,
+        isFavorited: !!data.isFavorited,
       };
     });
     cb(out);
@@ -55,6 +56,7 @@ export async function sendText(senderId: string, text: string) {
     createdAt: serverTimestamp(),
     isRead: false,
     isRevealed: true,
+    isFavorited: false,
   });
 }
 
@@ -70,6 +72,7 @@ export async function sendMedia(
     createdAt: serverTimestamp(),
     isRead: false,
     isRevealed: false,
+    isFavorited: false,
   });
 }
 
@@ -97,4 +100,10 @@ export async function markAllReadFrom(otherUserId: string) {
     batch.update(doc(firestore(), MESSAGES, d.id), { isRead: true }),
   );
   await batch.commit();
+}
+
+export async function toggleFavorite(messageId: string, next: boolean) {
+  await updateDoc(doc(firestore(), MESSAGES, messageId), {
+    isFavorited: next,
+  });
 }
