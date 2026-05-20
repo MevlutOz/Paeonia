@@ -4,79 +4,121 @@
 Yunan mitolojisindeki **Şakayık (Paeonia) ve Apollon** efsanesinden ilhamla
 "utangaçlık" ve "gizlilik" hisleri üzerine kurgulanmıştır.
 
+🔗 Canlı: **[paeoniam.vercel.app](https://paeoniam.vercel.app)**
+
 ## Yığın
 
-- **Next.js 14 (App Router)** + TypeScript + Tailwind CSS
-- **Firebase**: Auth (e-posta+şifre), Firestore (real-time), Cloud Storage (çizim/foto), Cloud Messaging (web push)
+- **Next.js 14 (App Router)** + TypeScript + Tailwind CSS + Framer Motion
+- **Firebase**: Auth (e-posta+şifre), Firestore (real-time), **Realtime Database**
+  (ortak canlı tuval), Cloud Storage (çizim/foto), Cloud Messaging (web push)
 - **PWA**: `@ducanh2912/next-pwa` + manifest + service worker
-- **Çizim**: `react-sketch-canvas`
+- **Çizim**: HTML5 Canvas (2D context)
+
+## Modüller
+
+### 🌸 Mesajlar — `/chat`
+Real-time sohbet: metin, çizim, fotoğraf. Karşıdan gelen görseller **blur'lu**
+gelir, dokununca açılır + 2s blush glow. "Görüldü" yerine şakayık ikonu parlar.
+
+### 🍂 Kurutulmuş Yapraklar — `/album`
+Sohbetteki herhangi bir çizim veya fotoğraf favorilenerek kalıcı bir anı
+albümüne taşınır. Görsele **çift dokun** ya da köşesindeki **şakayık ikonuna**
+bas → favori (geri alınabilir). `/album` sayfası favorileri eskitilmiş parşömen
+estetiğiyle, "preslenmiş çiçek" hissinde bir grid'de listeler.
+
+### 🌅 Güneş Doğumu — Çevrimiçi Durumu & Ortak Canlı Tuval
+İki kullanıcı aynı anda sohbetteyken `/chat` arka planı yumuşak bir **gün doğumu
+gradyanına** geçer. Çizim ekranındaki **"Ortak Tuval"** modu (yalnızca karşı
+taraf çevrimiçiyken etkin), iki kişinin aynı tuval üzerine **canlı** birlikte
+çizmesini sağlar — Realtime Database ile nokta nokta senkron. **"Bahçeye As"**
+ile ortak çizim sohbete bir mesaj olarak düşer.
+
+Çevrimiçilik `users` koleksiyonunda heartbeat ile tutulur (`isOnline`,
+`lastSeen`); karşı taraf yalnızca `isOnline` **ve** `lastSeen` son ~60 sn içinde
+ise çevrimiçi sayılır.
+
+### 🎵 Mırıldanma — Şarkı Kartları
+Sohbete bir **Spotify** veya **YouTube** linki yapıştırıldığında mesaj düz metin
+değil; yavaşça dönen plak motifli, şakayık çerçeveli, resmi embed'li bir
+**müzik kartı** olarak görünür. (API anahtarı gerekmez.)
+
+### 📷 Anılar — `/memories` & 📋 Planlar — `/plans`
+Anılar = şablon tabanlı fotoğraf kolajı (Cloud Function ile tek görsel export).
+Planlar = birlikte yapılacaklar listesi.
 
 ## Kurulum
 
 ```bash
 npm install
 cp .env.local.example .env.local   # Windows: copy .env.local.example .env.local
-# .env.local içine aşağıdaki Firebase bilgilerini doldur
+# .env.local içine Firebase bilgilerini doldur
 npm run dev
 ```
 
 ### Firebase'i hazırlama
 
-1. https://console.firebase.google.com/ üzerinden yeni bir proje aç (örn. `paeonia`).
-2. **Authentication** → Sign-in method → Email/Password etkinleştir. **2 kullanıcı** oluştur
-   (kendi e-postan + sevgilininki). Oluşturduğun UID'leri not al.
+1. https://console.firebase.google.com/ üzerinden yeni bir proje aç.
+2. **Authentication** → Email/Password etkinleştir. **2 kullanıcı** oluştur
+   (kendi e-postan + sevgilininki). UID'leri not al.
 3. **Firestore Database** → "Production mode" başlat.
-4. **Storage** → aç (Production mode).
-5. **Project settings → Your apps → Web** → yeni bir web uygulaması ekle (örn. `paeonia-web`).
-   Verilen `firebaseConfig` değerlerini `.env.local` içine yapıştır.
-6. **Cloud Messaging → Web configuration** sekmesinde bir **VAPID key pair** üret.
-   Public key'i `NEXT_PUBLIC_FIREBASE_VAPID_KEY` olarak `.env.local`'a koy.
-7. `NEXT_PUBLIC_ALLOWED_UIDS` alanına 2. adımdaki iki UID'i virgülle ayırarak yaz.
+4. **Realtime Database** → oluştur (bölge: europe-west1) — ortak canlı tuval için.
+5. **Storage** → aç.
+6. **Project settings → Your apps → Web** → web uygulaması ekle. `firebaseConfig`
+   değerlerini `.env.local`'a yapıştır — **`databaseURL` dahil**
+   (`NEXT_PUBLIC_FIREBASE_DATABASE_URL`).
+7. **Cloud Messaging → Web configuration** → **VAPID key pair** üret → public
+   key'i `NEXT_PUBLIC_FIREBASE_VAPID_KEY` olarak koy.
+8. `NEXT_PUBLIC_ALLOWED_UIDS` → 2. adımdaki iki UID'i virgülle ayırarak yaz.
 
 ### Güvenlik kuralları
 
-`firestore.rules` ve `storage.rules` dosyalarındaki
-`REPLACE_WITH_UID_1` / `REPLACE_WITH_UID_2` değerlerini gerçek UID'lerle güncelle, sonra deploy et:
+İki davetli UID `firestore.rules` (`allowedUids()` fonksiyonu) ve
+`database.rules.json` içinde tanımlıdır. Gerçek UID'lerle güncelleyip deploy et:
 
 ```bash
 npx firebase login
-npx firebase use --add        # az önce oluşturduğun projeyi seç
-npx firebase deploy --only firestore:rules,storage
+npx firebase use paeonia-garden
+npx firebase deploy --only firestore:rules,database,storage
 ```
+
+> ⚠️ Firebase kuralları, Vercel deploy'undan **bağımsızdır**. `firestore.rules`,
+> `database.rules.json` veya `storage.rules` değişince bu komutu **ayrıca**
+> çalıştırman gerekir — `git push` bunu yapmaz.
 
 ### Cloud Function (push bildirim trigger'ı)
 
 ```bash
-cd functions
-npm install
-cd ..
+cd functions && npm install && cd ..
 npx firebase deploy --only functions
 ```
 
-> Cloud Functions için **Firebase projesi Blaze planında** olmalıdır (cömert ücretsiz kotalar dahil).
+> Cloud Functions için **Firebase projesi Blaze planında** olmalıdır (cömert
+> ücretsiz kotalar dahil).
 
 ### Partner eşleştirmesi
 
-İlk girişten sonra her iki kullanıcı için Firestore'da `users/{uid}.partnerId` alanını
-karşı tarafın UID'i olarak güncelle (Console üzerinden veya küçük bir admin betiği ile).
+Her iki kullanıcı için Firestore'da `users/{uid}.partnerId` alanını karşı
+tarafın UID'i olarak güncelle (Console üzerinden veya küçük bir admin betiği ile).
 
 ### PWA ikonları
 
-`public/icons/icon.svg`'i istediğin gibi düzenleyebilirsin. Sonra:
+`public/icons/icon.svg`'i düzenleyip PNG sürümleri üret:
 
 ```bash
 npm run icons
 ```
 
-PNG sürümler (192, 512, apple-touch-icon, favicons) otomatik üretilir.
-
 ## Deployment
 
-```bash
-# Vercel'e push'la
-git init && git add . && git commit -m "Paeonia first bloom"
-# Vercel dashboard üzerinden import → env değişkenleri ekle → deploy
-```
+Proje **Vercel** (`paeoniam`) ve **GitHub** (`MevlutOz/Paeonia`) reposuna bağlıdır:
+
+- `main` dalına her `git push` → **otomatik production deploy**.
+- Diğer dallara push → otomatik **preview** deploy.
+- İlk kurulumda Vercel proje ayarlarına tüm `NEXT_PUBLIC_*` env değişkenlerini
+  eklemeyi unutma (`NEXT_PUBLIC_FIREBASE_DATABASE_URL` dahil).
+
+> PWA service worker agresif cache'ler — yeni sürümü göremezsen hard refresh
+> (`Ctrl+Shift+R`) ya da DevTools → Application → Service Workers → Unregister.
 
 ## Klasör yapısı
 
@@ -85,39 +127,50 @@ src/
 ├─ app/
 │  ├─ page.tsx               # Splash (şakayık tomurcuğu açılır)
 │  ├─ login/page.tsx         # Davetli girişi
-│  ├─ chat/page.tsx          # Gizli Bahçe (real-time sohbet)
-│  ├─ firebase-messaging-sw.js/route.ts  # FCM service worker (env templated)
+│  ├─ home/page.tsx          # Ana sayfa (4 kart)
+│  ├─ chat/page.tsx          # Mesajlar + presence + gün doğumu
+│  ├─ album/page.tsx         # Kurutulmuş Yapraklar (favori albümü)
+│  ├─ memories/…             # Anılar (kolaj)
+│  ├─ plans/page.tsx         # Planlar
+│  ├─ firebase-messaging-sw.js/route.ts  # FCM service worker
 │  ├─ layout.tsx / globals.css
 ├─ components/
-│  ├─ MessageList.tsx
-│  ├─ MessageBubble.tsx      # asimetrik baloncuk + blur/blush + şakayık "okundu"
-│  ├─ MessageInput.tsx
-│  ├─ CanvasBottomSheet.tsx  # şakayık paletli çizim tahtası
-│  ├─ PeonyIcon.tsx
+│  ├─ MessageList / MessageBubble / MessageInput
+│  ├─ CanvasBottomSheet.tsx  # tek başına çizim + "Ortak Tuval" modu
+│  ├─ LiveCanvas.tsx         # RTDB nokta-nokta ortak canlı tuval
+│  ├─ MusicCard.tsx          # Spotify/YouTube müzik kartı
+│  ├─ Collage / CollageTemplatePicker / Lightbox / SongPicker
+│  ├─ PeonyIcon / PeonyDraw / FallingPetals
 ├─ lib/
-│  ├─ firebase.ts
-│  ├─ auth.ts
-│  ├─ messages.ts            # subscribeMessages, sendText, sendMedia, mark*
-│  ├─ storage.ts
-│  ├─ fcm.ts                 # token request + persist
-│  ├─ types.ts
-functions/                   # Cloud Function (FCM gönderici)
-public/
-├─ manifest.json
-├─ icons/ (icon.svg + üretilen PNG'ler)
-firestore.rules / storage.rules / firebase.json
+│  ├─ firebase.ts            # Firestore + RTDB + Storage + Auth
+│  ├─ auth.ts / messages.ts / storage.ts / memories.ts / plans.ts
+│  ├─ usePresence.ts         # heartbeat tabanlı çevrimiçi durumu
+│  ├─ liveCanvas.ts          # RTDB ortak çizim katmanı
+│  ├─ links.ts               # Spotify/YouTube link tespiti
+│  ├─ fcm.ts / music.ts / collage.ts / format.ts / types.ts
+functions/                   # Cloud Functions (FCM + kolaj export)
+firestore.rules / database.rules.json / storage.rules / firebase.json
+docs/superpowers/            # tasarım spec'leri + implementasyon planları
 ```
 
 ## Tasarım kararları
 
 - Saf siyah/gri kullanılmaz → `aphrodite-dark` (#4A2E35) gölgeleri verir.
-- Mesaj baloncukları dikdörtgen değil; şakayık taç yapraklarını andıran asimetrik radius'lar.
+- Mesaj baloncukları dikdörtgen değil; şakayık taç yapraklarını andıran
+  asimetrik radius'lar.
 - "Görüldü" yerine küçük bir **şakayık ikonu** parlar.
-- Karşıdan gelen drawing/photo varsayılan **blur'lu**; dokununca açılır + 2s **blush glow**.
+- Karşıdan gelen drawing/photo varsayılan **blur'lu**; dokununca açılır + 2s
+  **blush glow**.
 - Splash'te kapalı tomurcuk `animate-bloom` ile açılır.
+- Albüm = eskitilmiş **parşömen** tonları, hafif eğik "preslenmiş çiçek" grid'i.
+- Ortak tuval koordinatları **0–1 normalize** edilir → farklı ekran boyutlarında
+  doğru hizalanır.
 
-## Sırada ne var?
+## Yol haritası
 
-- [ ] Foto gönderme (mevcut storage altyapısı hazır, sadece UI ekle: `MessageInput` içine bir kamera/galeri butonu).
-- [ ] Tepki/kalp atışı animasyonu (apollo-gold burst).
-- [ ] Sesli not / kısa video.
+- [x] Foto gönderme
+- [x] Kurutulmuş Yapraklar — favori anı albümü
+- [x] Güneş Doğumu — presence + ortak canlı tuval
+- [x] Mırıldanma — Spotify/YouTube şarkı kartları
+- [ ] Tepki/kalp atışı animasyonu (apollo-gold burst)
+- [ ] Sesli not / kısa video
