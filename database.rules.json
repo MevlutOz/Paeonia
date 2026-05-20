@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "liveCanvas": {
+      ".read": "auth != null && (auth.uid === 'WOOetHE8NbhBjoYKiW5VDW17Ufu1' || auth.uid === 'CgZyp1HrxQOKC2MqHTKxsI0wVN83')",
+      ".write": "auth != null && (auth.uid === 'WOOetHE8NbhBjoYKiW5VDW17Ufu1' || auth.uid === 'CgZyp1HrxQOKC2MqHTKxsI0wVN83')"
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
