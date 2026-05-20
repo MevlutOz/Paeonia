@@ -119,6 +119,32 @@ export default function HomePage() {
             </p>
           </div>
         </Link>
+
+        <Link
+          href="/album"
+          className="group glass-card rounded-3xl p-5 flex items-center gap-4 transition active:scale-[0.98] hover:shadow-blush-soft"
+        >
+          <div className="h-14 w-14 shrink-0 grid place-items-center rounded-2xl bg-peony-light/30 text-peony-dark p-3">
+            <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M6 3h9l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm9 0v5h5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <circle cx="11.5" cy="14.5" r="3.2" fill="currentColor" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="font-display text-2xl text-aphrodite-dark">
+              Kurutulmuş Yapraklar
+            </h2>
+            <p className="text-sm text-aphrodite-dark/60">
+              Favori çizimler ve fotoğraflar
+            </p>
+          </div>
+        </Link>
       </div>
 
       <p className="relative text-center text-[11px] text-aphrodite-dark/40 pb-[max(env(safe-area-inset-bottom),16px)]">
