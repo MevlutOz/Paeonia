@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { PeonyIcon } from "./PeonyIcon";
+import { LiveCanvas } from "./LiveCanvas";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSend: (dataUrl: string) => Promise<void>;
+  partnerOnline: boolean;
+  uid: string;
 }
 
 type Tool = "brush" | "eraser" | "fill";
@@ -102,7 +105,13 @@ function floodFill(
   ctx.putImageData(img, 0, 0);
 }
 
-export function CanvasBottomSheet({ open, onClose, onSend }: Props) {
+export function CanvasBottomSheet({
+  open,
+  onClose,
+  onSend,
+  partnerOnline,
+  uid,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const dprRef = useRef(1);
@@ -116,6 +125,13 @@ export function CanvasBottomSheet({ open, onClose, onSend }: Props) {
   const [recent, setRecent] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
+
+  const [mode, setMode] = useState<"solo" | "live">("solo");
+
+  // Partner çevrimdışı olursa tek-başına moda geri dön.
+  useEffect(() => {
+    if (!partnerOnline && mode === "live") setMode("solo");
+  }, [partnerOnline, mode]);
 
   const paintWhite = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
     ctx.save();
@@ -320,6 +336,39 @@ export function CanvasBottomSheet({ open, onClose, onSend }: Props) {
             <span className="block h-1.5 w-12 rounded-full bg-peony-light/60 mx-auto" />
           </div>
 
+          <div className="px-5 pt-2">
+            <div className="flex rounded-xl bg-peony-light/20 p-1">
+              <button
+                type="button"
+                onClick={() => setMode("solo")}
+                className={clsx(
+                  "flex-1 h-9 rounded-lg text-sm font-medium transition",
+                  mode === "solo"
+                    ? "bg-white text-aphrodite-dark shadow-petal"
+                    : "text-aphrodite-dark/55",
+                )}
+              >
+                Tek Başına
+              </button>
+              <button
+                type="button"
+                onClick={() => partnerOnline && setMode("live")}
+                disabled={!partnerOnline}
+                className={clsx(
+                  "flex-1 h-9 rounded-lg text-sm font-medium transition",
+                  mode === "live"
+                    ? "bg-white text-aphrodite-dark shadow-petal"
+                    : "text-aphrodite-dark/55",
+                  !partnerOnline && "opacity-40",
+                )}
+              >
+                {partnerOnline ? "Ortak Tuval 🌅" : "Ortak Tuval · çevrimdışı"}
+              </button>
+            </div>
+          </div>
+
+          {mode === "solo" && (
+            <>
           <div className="px-5 pt-2 pb-2 flex items-center justify-between">
             <div className="flex items-center gap-2 text-peony-default">
               <PeonyIcon size={20} />
@@ -472,6 +521,12 @@ export function CanvasBottomSheet({ open, onClose, onSend }: Props) {
               {sending ? "Açılıyor…" : "Gönder"}
             </button>
           </div>
+            </>
+          )}
+
+          {mode === "live" && (
+            <LiveCanvas uid={uid} onSend={onSend} onClose={onClose} />
+          )}
         </div>
       </div>
     </>
