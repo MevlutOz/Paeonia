@@ -38,7 +38,7 @@ service cloud.firestore {
       // Either user can flip isRead / isRevealed (these are the only mutable fields).
       allow update: if isInvited()
         && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['isRead', 'isRevealed']);
+              .hasOnly(['isRead', 'isRevealed', 'isFavorited']);
 
       allow delete: if false;
     }
