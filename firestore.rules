@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🌸 Paeonia is a 2-person garden.
+    // Replace these UIDs with the actual Firebase Auth UIDs of the only
+    // two accounts allowed to use the app.
+    function allowedUids() {
+      return [
+        'WOOetHE8NbhBjoYKiW5VDW17Ufu1',
+        'CgZyp1HrxQOKC2MqHTKxsI0wVN83'
+      ];
+    }
+
+    function isInvited() {
+      return request.auth != null && request.auth.uid in allowedUids();
+    }
+
+    match /users/{userId} {
+      allow read:   if isInvited();
+      // A user can only create/update their own profile document.
+      allow create: if isInvited() && request.auth.uid == userId;
+      allow update: if isInvited() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /messages/{messageId} {
+      allow read: if isInvited();
+
+      // Sender can create a message authored by themselves with valid schema.
+      allow create: if isInvited()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.type in ['text', 'drawing', 'photo']
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 4000;
+
+      // Either user can flip isRead / isRevealed (these are the only mutable fields).
+      allow update: if isInvited()
+        && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['isRead', 'isRevealed']);
+
+      allow delete: if false;
+    }
+
+    // Shared memories — either invited user can manage them.
+    match /memories/{memoryId} {
+      allow read: if isInvited();
+      allow create: if isInvited()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.title is string;
+      allow update: if isInvited();
+      allow delete: if isInvited();
+    }
+
+    // Shared plans (activity list) — either invited user can manage them.
+    match /plans/{planId} {
+      allow read: if isInvited();
+      allow create: if isInvited()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.title is string;
+      allow update: if isInvited();
+      allow delete: if isInvited();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

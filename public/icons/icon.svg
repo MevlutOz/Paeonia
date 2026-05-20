@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#F7FAF9"/>
+      <stop offset="100%" stop-color="#F4B0BC"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 264) scale(1.9) translate(-120 -120)">
+    <path d="M120,120 Q163.0,65.5 120.0,19.0 Q77.0,65.5 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q188.0,105.9 184.9,42.6 Q122.1,50.6 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q181.2,152.9 219.5,102.5 Q166.2,68.2 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q145.7,184.5 207.5,170.5 Q188.7,110.0 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q98.2,186.0 154.5,214.9 Q179.1,156.5 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q60.9,156.5 85.5,214.9 Q141.8,186.0 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q51.3,110.0 32.5,170.5 Q94.3,184.5 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q73.8,68.2 20.5,102.5 Q58.8,152.9 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q117.9,50.6 55.1,42.6 Q52.0,105.9 120,120 Z" fill="#F2A7B3" stroke="#E06D78" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q170.4,100.5 151.7,54.2 Q103.8,68.4 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q166.7,147.3 191.2,103.8 Q150.2,75.2 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q127.8,173.5 177.1,165.5 Q173.9,115.7 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q83.0,159.4 120.0,193.0 Q157.0,159.4 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q66.1,115.7 62.9,165.5 Q112.2,173.5 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q89.8,75.2 48.8,103.8 Q73.3,147.3 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q136.2,68.4 88.3,54.2 Q69.6,100.5 120,120 Z" fill="#E06D78" stroke="#A93344" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q158.2,107.8 137.3,76.3 Q100.5,85.0 120,120 Z" fill="#A93344" stroke="#7D2433" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q143.4,152.5 166.9,123.0 Q147.3,90.7 120,120 Z" fill="#A93344" stroke="#7D2433" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q96.3,152.3 131.7,165.5 Q156.3,136.9 120,120 Z" fill="#A93344" stroke="#7D2433" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q82.0,107.4 80.3,145.2 Q115.2,159.8 120,120 Z" fill="#A93344" stroke="#7D2433" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120,120 Q120.2,79.9 83.8,90.0 Q80.7,127.7 120,120 Z" fill="#A93344" stroke="#7D2433" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="120" cy="120" r="17" fill="#E8B851" stroke="#C9972F" stroke-width="2.2"/>
+    <circle cx="120" cy="120" r="6.2" fill="#F7FAF9"/>
+  </g>
+</svg>

@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function allowedUids() {
+      return [
+        'WOOetHE8NbhBjoYKiW5VDW17Ufu1',
+        'CgZyp1HrxQOKC2MqHTKxsI0wVN83'
+      ];
+    }
+
+    function isInvited() {
+      return request.auth != null && request.auth.uid in allowedUids();
+    }
+
+    // Drawings + photos live under /drawings/{uid}/* and /photos/{uid}/*
+    match /drawings/{uid}/{file=**} {
+      allow read: if isInvited();
+      allow write: if isInvited()
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+
+    match /photos/{uid}/{file=**} {
+      allow read: if isInvited();
+      allow write: if isInvited()
+        && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+
+    // Memory photos + generated collages.
+    match /memories/{uid}/{file=**} {
+      allow read: if isInvited();
+      allow write: if isInvited()
+        && request.auth.uid == uid
+        && request.resource.size < 12 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isInvited();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
