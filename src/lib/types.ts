@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type MessageType = "text" | "drawing" | "photo";
+export type MessageType = "text" | "drawing" | "photo" | "music";
 
 export interface PaeoniaUser {
   uid: string;
