@@ -31,7 +31,7 @@ service cloud.firestore {
       // Sender can create a message authored by themselves with valid schema.
       allow create: if isInvited()
         && request.resource.data.senderId == request.auth.uid
-        && request.resource.data.type in ['text', 'drawing', 'photo']
+        && request.resource.data.type in ['text', 'drawing', 'photo', 'music']
         && request.resource.data.content is string
         && request.resource.data.content.size() <= 4000;
 
