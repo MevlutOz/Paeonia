@@ -5,6 +5,7 @@ import Image from "next/image";
 import clsx from "clsx";
 import type { Message } from "@/lib/types";
 import { PeonyIcon } from "./PeonyIcon";
+import { MusicCard } from "./MusicCard";
 import { markRevealed, toggleFavorite } from "@/lib/messages";
 
 interface Props {
@@ -88,6 +89,10 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
           >
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
           </div>
+        )}
+
+        {message.type === "music" && (
+          <MusicCard url={message.content} mine={mine} />
         )}
 
         {isMedia && (
