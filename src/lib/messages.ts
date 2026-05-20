@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import type { Message, MessageType } from "./types";
+import { detectMusicLink } from "./links";
 
 const MESSAGES = "messages";
 
@@ -49,10 +50,11 @@ export function subscribeMessages(
 export async function sendText(senderId: string, text: string) {
   const trimmed = text.trim();
   if (!trimmed) return;
+  const music = detectMusicLink(trimmed);
   await addDoc(collection(firestore(), MESSAGES), {
     senderId,
-    type: "text",
-    content: trimmed,
+    type: music ? "music" : "text",
+    content: music ? music.originalUrl : trimmed,
     createdAt: serverTimestamp(),
     isRead: false,
     isRevealed: true,
