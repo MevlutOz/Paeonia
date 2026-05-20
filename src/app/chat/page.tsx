@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { onUser, signOut } from "@/lib/auth";
@@ -19,6 +20,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { CanvasBottomSheet } from "@/components/CanvasBottomSheet";
 import { Lightbox } from "@/components/Lightbox";
 import { PeonyIcon } from "@/components/PeonyIcon";
+import { usePresence } from "@/lib/usePresence";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function ChatPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const fcmAsked = useRef(false);
+  const { partnerOnline } = usePresence(user?.uid ?? null);
 
   useEffect(() => {
     const unsub = onUser((u) => {
@@ -96,7 +99,18 @@ export default function ChatPage() {
   if (!user) return null;
 
   return (
-    <main className="relative mx-auto max-w-xl flex flex-col h-dvh">
+    <main className="relative isolate mx-auto max-w-xl flex flex-col h-dvh">
+      <div
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute inset-0 -z-10 transition-opacity duration-[1500ms]",
+          partnerOnline ? "opacity-100" : "opacity-0",
+        )}
+        style={{
+          background:
+            "linear-gradient(180deg, #FFE3B0 0%, #FBC79A 34%, #F7A98C 64%, #F2A7B3 100%)",
+        }}
+      />
       <header className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex items-center justify-between">
         <button
           type="button"
@@ -143,6 +157,8 @@ export default function ChatPage() {
         open={canvasOpen}
         onClose={() => setCanvasOpen(false)}
         onSend={handleDrawing}
+        partnerOnline={partnerOnline}
+        uid={user.uid}
       />
 
       <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
