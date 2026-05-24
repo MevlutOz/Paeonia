@@ -108,6 +108,51 @@ tarafın UID'i olarak güncelle (Console üzerinden veya küçük bir admin beti
 npm run icons
 ```
 
+## 🎵 Spotify Şarkı Kırpma Kurulumu
+
+Anılar modülünde IG Stories tarzı şarkı kırpma için Spotify Web Playback SDK
+kullanılır. Hem sen hem partnerin **Spotify Premium** abonesi olmalı.
+
+### 1. Spotify Developer App oluştur
+
+1. https://developer.spotify.com/dashboard → giriş yap → **Create app**.
+2. Form:
+   - **App name:** `Paeonia`
+   - **App description:** `Love app` (veya istediğin)
+   - **Redirect URIs** (iki tane ekle, `Add` butonuyla):
+     - `http://127.0.0.1:3000/auth/spotify/callback` (dev — Spotify
+       `localhost`'a izin vermiyor, **127.0.0.1 kullan**)
+     - `https://paeoniam.vercel.app/auth/spotify/callback` (prod, kendi
+       domain'in)
+   - **Which API/SDKs:** ✅ Web API + ✅ Web Playback SDK
+   - Terms onayla → Save.
+
+### 2. User Management
+
+Dashboard → app → **User Management** → hem senin hem partnerinin Spotify
+e-mail'ini ekle. Development Mode'da Spotify yalnızca eklenmiş kullanıcılara
+OAuth izni verir (25 kullanıcıya kadar bedava).
+
+### 3. Client ID'yi env'lere yaz
+
+App → **Settings** → "Client ID"yi kopyala. **Client Secret'a basma — PKCE
+kullandığımız için gerekmez ve hiçbir yere yazılmamalı.**
+
+`.env.local`:
+
+```
+NEXT_PUBLIC_SPOTIFY_CLIENT_ID=...
+```
+
+Vercel → Project → Settings → Environment Variables → aynı anahtarı
+**Production + Preview + Development** üçüne ekle.
+
+### 4. İlk bağlanma
+
+Dev server'ı çalıştır (`npm run dev`), `http://127.0.0.1:3000/memories/new`
+adresine git (`localhost` değil), **Şarkı ekle → Spotify'a bağlan** → OAuth
+onayla. Aynı şeyi partnerin de bir kez yapsın.
+
 ## Deployment
 
 Proje **Vercel** (`paeoniam`) ve **GitHub** (`MevlutOz/Paeonia`) reposuna bağlıdır:
