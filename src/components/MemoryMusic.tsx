@@ -3,27 +3,183 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { MemorySong } from "@/lib/types";
+import { useSpotifyAuth } from "@/lib/useSpotifyAuth";
+import { useSpotifyPlayer } from "@/lib/useSpotifyPlayer";
+import { SpotifyConnectCard } from "./SpotifyConnectCard";
 
 interface Props {
   song: MemorySong;
 }
 
-/** Plays a memory's 30s song snippet (looping) with a now-playing chip. */
+const POLL_INTERVAL_MS = 250;
+const POLL_INTERVAL_HIDDEN_MS = 1000;
+
+/**
+ * Plays a memory's song.
+ * - New memories (song.spotifyTrackUri set): Spotify Web Playback SDK, loops
+ *   the [startMs, endMs] window. Shows a connect CTA if the viewer isn't
+ *   authenticated with Spotify yet.
+ * - Old memories (song.previewUrl only): HTML5 Audio loop of the 30s preview.
+ */
 export function MemoryMusic({ song }: Props) {
+  if (song.spotifyTrackUri) {
+    return <SpotifyMemoryMusic song={song} />;
+  }
+  if (song.previewUrl) {
+    return <ItunesMemoryMusic song={song} />;
+  }
+  return null;
+}
+
+/* ---------- Spotify path ---------- */
+
+function SpotifyMemoryMusic({ song }: Props) {
+  const auth = useSpotifyAuth();
+  const player = useSpotifyPlayer();
+  const [playing, setPlaying] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const pollRef = useRef<number | null>(null);
+
+  const startMs = song.startMs ?? 0;
+  const endMs = song.endMs ?? startMs + 15_000;
+
+  function clearPoll() {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPoll();
+    const interval =
+      typeof document !== "undefined" && document.visibilityState === "hidden"
+        ? POLL_INTERVAL_HIDDEN_MS
+        : POLL_INTERVAL_MS;
+    pollRef.current = window.setInterval(async () => {
+      const pos = await player.getPosition();
+      if (pos === null) return;
+      if (pos >= endMs) {
+        await player.seek(startMs);
+      }
+    }, interval);
+  }
+
+  async function start() {
+    if (!song.spotifyTrackUri) return;
+    if (starting || playing) return;
+    if (!player.ready) return;
+    setStarting(true);
+    try {
+      await player.play(song.spotifyTrackUri, startMs);
+      setPlaying(true);
+      schedulePoll();
+    } catch {
+      setPlaying(false);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  // Adjust polling cadence when tab hides/shows.
+  useEffect(() => {
+    function onVisibility() {
+      if (pollRef.current !== null) schedulePoll();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clean up on unmount.
+  useEffect(() => {
+    return () => {
+      clearPoll();
+      void player.pause().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function toggle() {
+    if (!playing) {
+      await start();
+      return;
+    }
+    await player.pause();
+    clearPoll();
+    setPlaying(false);
+  }
+
+  // Auth/connection fallbacks
+  if (auth.status === "disconnected") {
+    return (
+      <SpotifyConnectCard
+        variant="compact"
+        song={{
+          title: song.title,
+          artist: song.artist,
+          artworkUrl: song.artworkUrl,
+        }}
+      />
+    );
+  }
+  if (player.notPremium) {
+    return (
+      <SongChip
+        song={song}
+        action={
+          <span className="text-[10px] text-white/80">Premium gerekli</span>
+        }
+        spinning={false}
+      />
+    );
+  }
+  if (player.error) {
+    return (
+      <SongChip
+        song={song}
+        action={
+          <span className="text-[10px] text-white/80">Player hatası</span>
+        }
+        spinning={false}
+      />
+    );
+  }
+
+  return (
+    <SongChip
+      song={song}
+      spinning={playing}
+      onClick={toggle}
+      action={
+        starting ? (
+          <span className="text-[10px] text-white/80">…</span>
+        ) : playing ? (
+          <PauseIcon />
+        ) : (
+          <PlayIcon />
+        )
+      }
+    />
+  );
+}
+
+/* ---------- iTunes path (eski anılar — değişmedi) ---------- */
+
+function ItunesMemoryMusic({ song }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
+    if (!song.previewUrl) return;
     const audio = new Audio(song.previewUrl);
     audio.loop = true;
     audio.volume = 0.85;
     audioRef.current = audio;
-
     audio
       .play()
       .then(() => setPlaying(true))
       .catch(() => setPlaying(false));
-
     return () => {
       audio.pause();
       audioRef.current = null;
@@ -45,11 +201,33 @@ export function MemoryMusic({ song }: Props) {
   }
 
   return (
+    <SongChip
+      song={song}
+      spinning={playing}
+      onClick={toggle}
+      action={playing ? <PauseIcon /> : <PlayIcon />}
+    />
+  );
+}
+
+/* ---------- Shared chip presentation ---------- */
+
+function SongChip({
+  song,
+  spinning,
+  onClick,
+  action,
+}: {
+  song: MemorySong;
+  spinning: boolean;
+  onClick?: () => void;
+  action: React.ReactNode;
+}) {
+  return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={onClick}
       className="flex items-center gap-2 rounded-full bg-aphrodite-dark/72 backdrop-blur-md text-white pl-1.5 pr-3 py-1.5 shadow-petal max-w-[80%]"
-      aria-label={playing ? "Müziği duraklat" : "Müziği çal"}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -57,25 +235,31 @@ export function MemoryMusic({ song }: Props) {
         alt=""
         className={clsx(
           "h-8 w-8 rounded-full object-cover border border-white/40",
-          playing && "animate-spin",
+          spinning && "animate-spin",
         )}
-        style={playing ? { animationDuration: "7s" } : undefined}
+        style={spinning ? { animationDuration: "7s" } : undefined}
       />
       <div className="min-w-0 text-left leading-tight">
         <p className="text-xs font-semibold truncate">{song.title}</p>
         <p className="text-[10px] text-white/70 truncate">{song.artist}</p>
       </div>
-      <span className="ml-0.5 shrink-0">
-        {playing ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </span>
+      <span className="ml-0.5 shrink-0">{action}</span>
     </button>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+    </svg>
   );
 }
