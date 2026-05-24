@@ -6,6 +6,7 @@ import { useSpotifyAuth } from "@/lib/useSpotifyAuth";
 import { pickArtwork, searchTracks, type SpotifyTrack } from "@/lib/spotify/api";
 import { PeonyIcon } from "./PeonyIcon";
 import { SpotifyConnectCard } from "./SpotifyConnectCard";
+import { SongTrimmer } from "./SongTrimmer";
 
 interface Props {
   value: MemorySong | null;
@@ -19,6 +20,7 @@ export function SongPicker({ value, onChange }: Props) {
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [pendingTrack, setPendingTrack] = useState<SpotifyTrack | null>(null);
 
   useEffect(() => {
     if (!open || !accessToken) return;
@@ -46,18 +48,23 @@ export function SongPicker({ value, onChange }: Props) {
     return () => clearTimeout(t);
   }, [query, open, accessToken]);
 
-  function selectTrack(track: SpotifyTrack) {
-    // Task 10 will hand off to SongTrimmer first; for now save with default trim.
+  function pickTrackForTrim(track: SpotifyTrack) {
+    setPendingTrack(track);
+  }
+
+  function confirmTrim(startMs: number, endMs: number) {
+    if (!pendingTrack) return;
     onChange({
-      title: track.name,
-      artist: track.artists.map((a) => a.name).join(", "),
-      artworkUrl: pickArtwork(track),
-      spotifyTrackUri: track.uri,
-      spotifyTrackId: track.id,
-      durationMs: track.duration_ms,
-      startMs: 0,
-      endMs: Math.min(15_000, track.duration_ms),
+      title: pendingTrack.name,
+      artist: pendingTrack.artists.map((a) => a.name).join(", "),
+      artworkUrl: pickArtwork(pendingTrack),
+      spotifyTrackUri: pendingTrack.uri,
+      spotifyTrackId: pendingTrack.id,
+      durationMs: pendingTrack.duration_ms,
+      startMs,
+      endMs,
     });
+    setPendingTrack(null);
     setOpen(false);
     setQuery("");
     setResults([]);
@@ -132,6 +139,21 @@ export function SongPicker({ value, onChange }: Props) {
     );
   }
 
+  // Open + a track is pending trim → show the trimmer
+  if (pendingTrack) {
+    return (
+      <SongTrimmer
+        trackUri={pendingTrack.uri}
+        durationMs={pendingTrack.duration_ms}
+        artworkUrl={pickArtwork(pendingTrack)}
+        title={pendingTrack.name}
+        artist={pendingTrack.artists.map((a) => a.name).join(", ")}
+        onCancel={() => setPendingTrack(null)}
+        onConfirm={confirmTrim}
+      />
+    );
+  }
+
   // Open: either connect CTA or search UI
   return (
     <div>
@@ -185,7 +207,7 @@ export function SongPicker({ value, onChange }: Props) {
               <button
                 key={track.id}
                 type="button"
-                onClick={() => selectTrack(track)}
+                onClick={() => pickTrackForTrim(track)}
                 className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-peony-light/15 text-left"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
