@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "@/lib/firebase";
 import {
@@ -10,6 +11,19 @@ import {
   exchangeCode,
 } from "@/lib/spotify/auth";
 import { PeonyIcon } from "@/components/PeonyIcon";
+
+/**
+ * Wait for Firebase's first onAuthStateChanged fire. Spotify's OAuth redirect
+ * is a full page reload, so currentUser is null in the first tick after mount.
+ */
+function awaitAuthUser(): Promise<User | null> {
+  return new Promise((resolve) => {
+    const unsub = onAuthStateChanged(firebaseAuth(), (u) => {
+      unsub();
+      resolve(u);
+    });
+  });
+}
 
 export default function SpotifyCallbackPage() {
   const router = useRouter();
@@ -56,9 +70,15 @@ export default function SpotifyCallbackPage() {
 
     (async () => {
       try {
+        // Wait for Firebase auth hydration BEFORE consuming the auth code.
+        // The code expires fast (~10 min) but Firebase rehydration is sub-second
+        // — this is safe and avoids the "Firebase oturumu yok" race.
+        const user = await awaitAuthUser();
+        if (!user) {
+          setError("Firebase oturumu yok — önce Paeonia'ya giriş yap.");
+          return;
+        }
         const tokens = await exchangeCode({ code, verifier });
-        const user = firebaseAuth().currentUser;
-        if (!user) throw new Error("Firebase oturumu yok.");
         await setDoc(
           doc(firestore(), "users", user.uid),
           {
