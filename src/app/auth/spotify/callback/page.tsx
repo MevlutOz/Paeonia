@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "@/lib/firebase";
@@ -15,8 +15,16 @@ export default function SpotifyCallbackPage() {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  // Spotify auth codes are single-use. React StrictMode double-fires effects
+  // in dev — the second call would 400 with "invalid_grant" if we let it run.
+  // This ref makes the exchange idempotent across re-mounts within the same
+  // page load.
+  const ranRef = useRef(false);
 
   useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
     const errorParam = params.get("error");
     if (errorParam) {
       setError(`Spotify reddetti: ${errorParam}`);
@@ -41,6 +49,11 @@ export default function SpotifyCallbackPage() {
       return;
     }
 
+    // Clear the verifier eagerly so any stray re-run can't reuse it either.
+    localStorage.removeItem(authStorageKeys.verifier);
+    localStorage.removeItem(authStorageKeys.state);
+    localStorage.removeItem(authStorageKeys.returnTo);
+
     (async () => {
       try {
         const tokens = await exchangeCode({ code, verifier });
@@ -55,9 +68,6 @@ export default function SpotifyCallbackPage() {
           { merge: true },
         );
         cacheAccessToken(tokens.access_token, tokens.expires_in);
-        localStorage.removeItem(authStorageKeys.verifier);
-        localStorage.removeItem(authStorageKeys.state);
-        localStorage.removeItem(authStorageKeys.returnTo);
         router.replace(returnTo);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Bilinmeyen hata";
