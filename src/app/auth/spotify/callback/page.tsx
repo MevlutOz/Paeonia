@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
@@ -25,7 +25,7 @@ function awaitAuthUser(): Promise<User | null> {
   });
 }
 
-export default function SpotifyCallbackPage() {
+function CallbackInner() {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -117,5 +117,19 @@ export default function SpotifyCallbackPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function SpotifyCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-dvh grid place-items-center p-4">
+          <PeonyIcon size={56} glow />
+        </main>
+      }
+    >
+      <CallbackInner />
+    </Suspense>
   );
 }
