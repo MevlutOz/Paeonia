@@ -59,6 +59,7 @@ export function SongTrimmer({
   );
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [previewStarting, setPreviewStarting] = useState(false);
   // Anchor data for the "drag the whole window" gesture — captured on pointerdown,
   // read on pointermove, cleared on pointerup.
   const windowDragRef = useRef<{
@@ -102,8 +103,10 @@ export function SongTrimmer({
   }, [startMs, endMs]);
 
   async function startPreview() {
-    if (!player.ready) return;
+    if (previewStarting) return;
+    setPreviewStarting(true);
     try {
+      // player.play() awaits SDK ready internally — safe to call before ready.
       await player.play(trackUri, startMs);
       setPreviewing(true);
       if (previewPollRef.current !== null)
@@ -116,8 +119,11 @@ export function SongTrimmer({
           stopPreview();
         }
       }, 250);
-    } catch {
+    } catch (e) {
+      console.warn("Preview play failed:", e);
       setPreviewing(false);
+    } finally {
+      setPreviewStarting(false);
     }
   }
 
@@ -279,14 +285,16 @@ export function SongTrimmer({
         <button
           type="button"
           onClick={() => (previewing ? stopPreview() : startPreview())}
-          disabled={!player.ready}
+          disabled={previewStarting}
           className={clsx(
             "mt-2 w-full py-2 rounded-full font-medium text-sm",
-            "bg-aphrodite-dark/85 text-white disabled:opacity-50",
+            "bg-aphrodite-dark/85 text-white disabled:opacity-70",
           )}
         >
           {previewing
             ? `❚❚ Durdur`
+            : previewStarting
+            ? "Hazırlanıyor…"
             : `▶ Önizle (${Math.round(lengthMs / 1000)} sn)`}
         </button>
         {player.notPremium && (

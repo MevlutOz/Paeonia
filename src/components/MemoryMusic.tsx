@@ -68,13 +68,15 @@ function SpotifyMemoryMusic({ song }: Props) {
   async function start() {
     if (!song.spotifyTrackUri) return;
     if (starting || playing) return;
-    if (!player.ready) return;
+    // player.play() internally awaits SDK ready — we don't bail if !ready.
+    // The UI shows "..." (starting state) until playback actually begins.
     setStarting(true);
     try {
       await player.play(song.spotifyTrackUri, startMs);
       setPlaying(true);
       schedulePoll();
-    } catch {
+    } catch (e) {
+      console.warn("Memory music play failed:", e);
       setPlaying(false);
     } finally {
       setStarting(false);
