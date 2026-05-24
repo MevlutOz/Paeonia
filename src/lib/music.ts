@@ -5,6 +5,9 @@ import { firebaseApp } from "./firebase";
 import type { MemorySong } from "./types";
 
 export interface SongResult extends MemorySong {
+  // iTunes search results always have a preview URL (Cloud Function filters
+  // entries without one). Narrow the optional MemorySong.previewUrl to required.
+  previewUrl: string;
   trackId: number;
 }
 

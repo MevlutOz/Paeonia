@@ -7,6 +7,8 @@ export interface PaeoniaUser {
   displayName: string;
   fcmToken?: string | null;
   partnerId?: string | null;
+  spotifyRefreshToken?: string | null;
+  spotifyConnectedAt?: Timestamp | null;
 }
 
 export interface Message {
@@ -43,7 +45,14 @@ export interface MemorySong {
   title: string;
   artist: string;
   artworkUrl: string;
-  previewUrl: string;
+  // Spotify path — yeni anılar için
+  spotifyTrackUri?: string;   // "spotify:track:6rqhFgbbKwnb9MLmUQDhG6"
+  spotifyTrackId?: string;
+  durationMs?: number;        // tam şarkı süresi (trim UI için)
+  startMs?: number;           // kırpma başı
+  endMs?: number;             // kırpma sonu (endMs - startMs ∈ [5000, 30000])
+  // iTunes path — eski anılar için (yeni anılarda yazılmaz)
+  previewUrl?: string;
 }
 
 export interface Plan {
