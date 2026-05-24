@@ -33,8 +33,15 @@ export async function searchTracks(
 ): Promise<SpotifyTrack[]> {
   const q = query.trim();
   if (!q) return [];
+  // Spotify is picky about the search URL — use URLSearchParams for proper
+  // RFC 3986 encoding and put q first (some Spotify SDKs/docs assume that order).
+  const params = new URLSearchParams({
+    q,
+    type: "track",
+    limit: String(limit),
+  });
   const data = await get<{ tracks: { items: SpotifyTrack[] } }>(
-    `/search?type=track&limit=${limit}&q=${encodeURIComponent(q)}`,
+    `/search?${params.toString()}`,
     accessToken,
   );
   return data.tracks?.items ?? [];
