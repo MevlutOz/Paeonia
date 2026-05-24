@@ -29,17 +29,12 @@ async function get<T>(path: string, accessToken: string): Promise<T> {
 export async function searchTracks(
   query: string,
   accessToken: string,
-  limit = 20,
 ): Promise<SpotifyTrack[]> {
   const q = query.trim();
   if (!q) return [];
-  // Spotify is picky about the search URL — use URLSearchParams for proper
-  // RFC 3986 encoding and put q first (some Spotify SDKs/docs assume that order).
-  const params = new URLSearchParams({
-    q,
-    type: "track",
-    limit: String(limit),
-  });
+  // Spotify default limit is 20 — sending limit=20 explicitly was being
+  // rejected as "Invalid limit" in some edge cases; rely on default instead.
+  const params = new URLSearchParams({ q, type: "track" });
   const data = await get<{ tracks: { items: SpotifyTrack[] } }>(
     `/search?${params.toString()}`,
     accessToken,
