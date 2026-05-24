@@ -59,6 +59,14 @@ export function SongTrimmer({
   );
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // Anchor data for the "drag the whole window" gesture — captured on pointerdown,
+  // read on pointermove, cleared on pointerup.
+  const windowDragRef = useRef<{
+    startX: number;
+    initStart: number;
+    initEnd: number;
+    trackWidth: number;
+  } | null>(null);
 
   const player = useSpotifyPlayer();
   const previewPollRef = useRef<number | null>(null);
@@ -133,6 +141,7 @@ export function SongTrimmer({
   function bindHandle(which: "start" | "end") {
     return {
       onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
         const rect = trackRef.current!.getBoundingClientRect();
         handlePointer(which, e.clientX, rect);
@@ -144,6 +153,47 @@ export function SongTrimmer({
       },
       onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
         e.currentTarget.releasePointerCapture(e.pointerId);
+      },
+    };
+  }
+
+  function bindWindow() {
+    return {
+      onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+        // If the user grabbed a handle, the handle's stopPropagation prevents
+        // us from getting this — so we're safely in "drag the middle" mode.
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const rect = trackRef.current!.getBoundingClientRect();
+        windowDragRef.current = {
+          startX: e.clientX,
+          initStart: startMs,
+          initEnd: endMs,
+          trackWidth: rect.width,
+        };
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+        const drag = windowDragRef.current;
+        if (!drag) return;
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+        const deltaPx = e.clientX - drag.startX;
+        const deltaMs = snap((deltaPx / drag.trackWidth) * durationMs);
+        const length = drag.initEnd - drag.initStart;
+        let newStart = drag.initStart + deltaMs;
+        let newEnd = drag.initEnd + deltaMs;
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd = length;
+        }
+        if (newEnd > durationMs) {
+          newEnd = durationMs;
+          newStart = durationMs - length;
+        }
+        setStartMs(newStart);
+        setEndMs(newEnd);
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        windowDragRef.current = null;
       },
     };
   }
@@ -186,20 +236,27 @@ export function SongTrimmer({
           ref={trackRef}
           className="relative h-10 rounded-full bg-peony-light/30 select-none touch-none"
         >
-          {/* selected window */}
+          {/* selected window — draggable from the middle */}
           <div
-            className="absolute top-0 h-full bg-peony-default/55 rounded-full"
+            {...bindWindow()}
+            className="absolute top-0 h-full bg-peony-default/55 rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center gap-0.5"
             style={{
               left: `${startPct}%`,
               width: `${Math.max(0, endPct - startPct)}%`,
             }}
-          />
+            aria-label="Parçayı sürükle"
+          >
+            {/* Subtle grip dots so users know the middle is grabbable. */}
+            <span className="h-1 w-1 rounded-full bg-white/70" />
+            <span className="h-1 w-1 rounded-full bg-white/70" />
+            <span className="h-1 w-1 rounded-full bg-white/70" />
+          </div>
           {/* start handle */}
           <button
             type="button"
             aria-label="Başlangıç"
             {...bindHandle("start")}
-            className="absolute top-1/2 -translate-y-1/2 h-7 w-7 -ml-3.5 rounded-full bg-apollo-gold border-2 border-white shadow-petal"
+            className="absolute top-1/2 -translate-y-1/2 h-7 w-7 -ml-3.5 rounded-full bg-apollo-gold border-2 border-white shadow-petal touch-none"
             style={{ left: `${startPct}%` }}
           />
           {/* end handle */}
@@ -207,26 +264,24 @@ export function SongTrimmer({
             type="button"
             aria-label="Bitiş"
             {...bindHandle("end")}
-            className="absolute top-1/2 -translate-y-1/2 h-7 w-7 -ml-3.5 rounded-full bg-apollo-gold border-2 border-white shadow-petal"
+            className="absolute top-1/2 -translate-y-1/2 h-7 w-7 -ml-3.5 rounded-full bg-apollo-gold border-2 border-white shadow-petal touch-none"
             style={{ left: `${endPct}%` }}
           />
         </div>
-        <div className="mt-2 flex justify-between text-[10px] text-aphrodite-dark/55">
+        <div className="mt-1.5 flex justify-between text-[10px] text-aphrodite-dark/55">
           <span>0:00</span>
           <span className="text-aphrodite-dark/80 font-medium">
             {fmt(startMs)} → {fmt(endMs)} · {Math.round(lengthMs / 1000)} sn
           </span>
           <span>{fmt(durationMs)}</span>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
+        {/* Önizle butonu slider'a bitişik dursun — kullanıcı scroll etmeden görsün. */}
         <button
           type="button"
           onClick={() => (previewing ? stopPreview() : startPreview())}
           disabled={!player.ready}
           className={clsx(
-            "w-full py-2.5 rounded-full font-medium",
+            "mt-2 w-full py-2 rounded-full font-medium text-sm",
             "bg-aphrodite-dark/85 text-white disabled:opacity-50",
           )}
         >
@@ -235,24 +290,25 @@ export function SongTrimmer({
             : `▶ Önizle (${Math.round(lengthMs / 1000)} sn)`}
         </button>
         {player.notPremium && (
-          <p className="text-xs text-red-600 text-center">
+          <p className="text-xs text-red-600 text-center mt-1">
             Önizleme için Spotify Premium gerekiyor 🌹
           </p>
         )}
         {player.error && (
-          <p className="text-xs text-red-600 text-center">{player.error}</p>
+          <p className="text-xs text-red-600 text-center mt-1">{player.error}</p>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            stopPreview();
-            onConfirm(startMs, endMs);
-          }}
-          className="w-full py-2.5 rounded-full bg-peony-default text-white font-medium"
-        >
-          Bu parçayı kullan
-        </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          stopPreview();
+          onConfirm(startMs, endMs);
+        }}
+        className="w-full py-2.5 rounded-full bg-peony-default text-white font-medium"
+      >
+        Bu parçayı kullan
+      </button>
     </div>
   );
 }
