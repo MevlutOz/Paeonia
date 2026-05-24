@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { searchMusic, type SongResult } from "@/lib/music";
+import { useEffect, useState } from "react";
 import type { MemorySong } from "@/lib/types";
+import { useSpotifyAuth } from "@/lib/useSpotifyAuth";
+import { pickArtwork, searchTracks, type SpotifyTrack } from "@/lib/spotify/api";
 import { PeonyIcon } from "./PeonyIcon";
+import { SpotifyConnectCard } from "./SpotifyConnectCard";
 
 interface Props {
   value: MemorySong | null;
@@ -11,69 +13,61 @@ interface Props {
 }
 
 export function SongPicker({ value, onChange }: Props) {
+  const { status, accessToken } = useSpotifyAuth();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SongResult[]>([]);
+  const [results, setResults] = useState<SpotifyTrack[]>([]);
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
-  const previewRef = useRef<HTMLAudioElement | null>(null);
-  const [previewing, setPreviewing] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !accessToken) return;
     const q = query.trim();
     if (q.length < 2) {
       setResults([]);
+      setSearchError(null);
       return;
     }
     setSearching(true);
+    setSearchError(null);
     const t = setTimeout(async () => {
       try {
-        setResults(await searchMusic(q));
-      } catch {
+        const items = await searchTracks(q, accessToken);
+        setResults(items);
+      } catch (e) {
         setResults([]);
+        setSearchError(
+          e instanceof Error ? e.message : "Arama yapılamadı",
+        );
       } finally {
         setSearching(false);
       }
     }, 450);
     return () => clearTimeout(t);
-  }, [query, open]);
+  }, [query, open, accessToken]);
 
-  useEffect(() => {
-    return () => {
-      previewRef.current?.pause();
-    };
-  }, []);
-
-  function togglePreview(song: SongResult) {
-    if (previewing === song.previewUrl) {
-      previewRef.current?.pause();
-      setPreviewing(null);
-      return;
-    }
-    previewRef.current?.pause();
-    const audio = new Audio(song.previewUrl);
-    audio.volume = 0.9;
-    previewRef.current = audio;
-    void audio.play().catch(() => {});
-    setPreviewing(song.previewUrl);
-    audio.onended = () => setPreviewing(null);
-  }
-
-  function selectSong(song: SongResult) {
-    previewRef.current?.pause();
-    setPreviewing(null);
+  function selectTrack(track: SpotifyTrack) {
+    // Task 10 will hand off to SongTrimmer first; for now save with default trim.
     onChange({
-      title: song.title,
-      artist: song.artist,
-      artworkUrl: song.artworkUrl,
-      previewUrl: song.previewUrl,
+      title: track.name,
+      artist: track.artists.map((a) => a.name).join(", "),
+      artworkUrl: pickArtwork(track),
+      spotifyTrackUri: track.uri,
+      spotifyTrackId: track.id,
+      durationMs: track.duration_ms,
+      startMs: 0,
+      endMs: Math.min(15_000, track.duration_ms),
     });
     setOpen(false);
     setQuery("");
     setResults([]);
   }
 
+  // Selected song card (collapsed view)
   if (value && !open) {
+    const trimSec = value.endMs != null && value.startMs != null
+      ? Math.round((value.endMs - value.startMs) / 1000)
+      : null;
     return (
       <div>
         <span className="text-xs uppercase tracking-wider text-aphrodite-dark/60">
@@ -92,6 +86,7 @@ export function SongPicker({ value, onChange }: Props) {
             </p>
             <p className="text-xs text-aphrodite-dark/60 truncate">
               {value.artist}
+              {trimSec !== null && ` · ${trimSec} sn parça`}
             </p>
           </div>
           <button
@@ -108,7 +103,12 @@ export function SongPicker({ value, onChange }: Props) {
             className="h-7 w-7 grid place-items-center rounded-full bg-aphrodite-dark/10 text-aphrodite-dark/60"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         </div>
@@ -116,6 +116,7 @@ export function SongPicker({ value, onChange }: Props) {
     );
   }
 
+  // "Şarkı ekle" idle button
   if (!open) {
     return (
       <button
@@ -131,6 +132,7 @@ export function SongPicker({ value, onChange }: Props) {
     );
   }
 
+  // Open: either connect CTA or search UI
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -139,86 +141,75 @@ export function SongPicker({ value, onChange }: Props) {
         </span>
         <button
           type="button"
-          onClick={() => {
-            setOpen(false);
-            previewRef.current?.pause();
-            setPreviewing(null);
-          }}
+          onClick={() => setOpen(false)}
           className="text-xs text-aphrodite-dark/55"
         >
           Vazgeç
         </button>
       </div>
-      <input
-        autoFocus
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Şarkı veya sanatçı adı…"
-        className="input-petal mt-1"
-      />
 
-      <div className="mt-2 max-h-64 overflow-y-auto chat-scroll rounded-xl">
-        {searching && (
-          <div className="py-4 grid place-items-center text-peony-default">
-            <PeonyIcon size={28} glow />
-          </div>
-        )}
-        {!searching && query.trim().length >= 2 && results.length === 0 && (
-          <p className="text-sm text-aphrodite-dark/55 py-3 text-center">
-            Sonuç bulunamadı.
-          </p>
-        )}
-        {results.map((song) => (
-          <div
-            key={song.trackId}
-            className="flex items-center gap-3 p-2 rounded-xl hover:bg-peony-light/15"
-          >
-            <button
-              type="button"
-              onClick={() => togglePreview(song)}
-              className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden"
-              aria-label="Önizle"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={song.artworkUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-              <span className="absolute inset-0 grid place-items-center bg-aphrodite-dark/35 text-white">
-                {previewing === song.previewUrl ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectSong(song)}
-              className="min-w-0 flex-1 text-left"
-            >
-              <p className="font-medium text-aphrodite-dark truncate">
-                {song.title}
+      {status !== "connected" || !accessToken ? (
+        <div className="mt-2">
+          <SpotifyConnectCard variant="full" />
+        </div>
+      ) : (
+        <>
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Şarkı veya sanatçı adı…"
+            className="input-petal mt-1"
+          />
+
+          <div className="mt-2 max-h-64 overflow-y-auto chat-scroll rounded-xl">
+            {searching && (
+              <div className="py-4 grid place-items-center text-peony-default">
+                <PeonyIcon size={28} glow />
+              </div>
+            )}
+            {searchError && !searching && (
+              <p className="text-sm text-red-600 py-3 text-center">
+                {searchError}
               </p>
-              <p className="text-xs text-aphrodite-dark/60 truncate">
-                {song.artist}
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectSong(song)}
-              className="text-xs font-medium text-white bg-peony-default rounded-full px-3 py-1.5 shrink-0"
-            >
-              Seç
-            </button>
+            )}
+            {!searching &&
+              !searchError &&
+              query.trim().length >= 2 &&
+              results.length === 0 && (
+                <p className="text-sm text-aphrodite-dark/55 py-3 text-center">
+                  Sonuç bulunamadı.
+                </p>
+              )}
+            {results.map((track) => (
+              <button
+                key={track.id}
+                type="button"
+                onClick={() => selectTrack(track)}
+                className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-peony-light/15 text-left"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pickArtwork(track)}
+                  alt=""
+                  className="h-12 w-12 rounded-lg object-cover shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-aphrodite-dark truncate">
+                    {track.name}
+                  </p>
+                  <p className="text-xs text-aphrodite-dark/60 truncate">
+                    {track.artists.map((a) => a.name).join(", ")}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-white bg-peony-default rounded-full px-3 py-1.5 shrink-0">
+                  Seç
+                </span>
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }
