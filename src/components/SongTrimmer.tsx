@@ -284,7 +284,12 @@ export function SongTrimmer({
         {/* Önizle butonu slider'a bitişik dursun — kullanıcı scroll etmeden görsün. */}
         <button
           type="button"
-          onClick={() => (previewing ? stopPreview() : startPreview())}
+          onClick={() => {
+            // Synchronously unlock iOS Safari's audio element inside the gesture.
+            player.activateElement();
+            if (previewing) stopPreview();
+            else void startPreview();
+          }}
           disabled={previewStarting}
           className={clsx(
             "mt-2 w-full py-2 rounded-full font-medium text-sm",

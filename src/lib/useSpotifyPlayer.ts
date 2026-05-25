@@ -78,6 +78,18 @@ export function useSpotifyPlayer() {
             notPremium: false,
           });
           readyResolveRef.current?.();
+          // Pre-warm: silently transfer playback to our device. This makes
+          // Spotify treat us as the active device, so when the user actually
+          // taps play we skip the ~500-1500ms Spotify Connect activation step.
+          const token = accessTokenRef.current;
+          if (token) {
+            void transferPlayback({
+              accessToken: token,
+              deviceId: d.device_id,
+            }).catch(() => {
+              /* play() has a 404 fallback if this didn't take */
+            });
+          }
         });
         player.addListener("not_ready", () => {
           deviceIdRef.current = null;
@@ -177,6 +189,21 @@ export function useSpotifyPlayer() {
     }
   }
 
+  /**
+   * Call this synchronously inside the user's gesture handler (onClick) to
+   * unlock iOS Safari's autoplay restrictions on the SDK's audio element.
+   * Idempotent and best-effort — silently no-ops if the SDK doesn't expose it
+   * yet (older SDK versions) or the player isn't created.
+   */
+  function activateElement(): void {
+    const sdk = playerRef.current;
+    if (sdk?.activateElement) {
+      void sdk.activateElement().catch(() => {
+        /* ignore — Spotify may have already activated it */
+      });
+    }
+  }
+
   async function pause(): Promise<void> {
     await playerRef.current?.pause();
   }
@@ -199,5 +226,6 @@ export function useSpotifyPlayer() {
     pause,
     seek,
     getPosition,
+    activateElement,
   };
 }

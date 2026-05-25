@@ -29,6 +29,12 @@ export interface SpotifyPlayer {
   seek(positionMs: number): Promise<void>;
   togglePlay(): Promise<void>;
   setVolume(value: number): Promise<void>;
+  /**
+   * iOS Safari & some mobile browsers require a silent audio element to be
+   * "activated" by a user gesture before any playback. Call this synchronously
+   * inside an onClick handler to unlock subsequent programmatic plays.
+   */
+  activateElement?: () => Promise<void>;
 }
 
 export interface PlayerState {

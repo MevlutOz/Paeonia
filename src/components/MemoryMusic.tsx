@@ -102,14 +102,17 @@ function SpotifyMemoryMusic({ song }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function toggle() {
+  function toggle() {
+    // Synchronously activate the SDK's audio element while we still hold the
+    // user gesture. THEN do async work. Otherwise iOS Safari blocks playback.
+    player.activateElement();
     if (!playing) {
-      await start();
-      return;
+      void start();
+    } else {
+      void player.pause();
+      clearPoll();
+      setPlaying(false);
     }
-    await player.pause();
-    clearPoll();
-    setPlaying(false);
   }
 
   // Auth/connection fallbacks
