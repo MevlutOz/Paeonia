@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { useSpotifyPlayer } from "@/lib/useSpotifyPlayer";
+import { useSpotifyPlayer } from "@/lib/SpotifyPlayerProvider";
 
 interface Props {
   trackUri: string;

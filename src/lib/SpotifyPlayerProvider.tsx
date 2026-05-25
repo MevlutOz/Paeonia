@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useSpotifyAuth } from "./useSpotifyAuth";
 import {
   createPlayer,
@@ -9,6 +16,26 @@ import {
   type SpotifyPlayer,
 } from "./spotify/player";
 
+interface PlayerCtx {
+  ready: boolean;
+  deviceId: string | null;
+  error: string | null;
+  notPremium: boolean;
+  play: (trackUri: string, positionMs: number) => Promise<void>;
+  pause: () => Promise<void>;
+  seek: (positionMs: number) => Promise<void>;
+  getPosition: () => Promise<number | null>;
+  activateElement: () => void;
+}
+
+/**
+ * Singleton wrapper around the Spotify Web Playback SDK. Mounted once at the
+ * app root so the SDK loads and connects as soon as the user has a Spotify
+ * refresh token — by the time they open a memory page, the player is ready
+ * and pre-warmed. Previously each consumer created its own player instance,
+ * causing 1–2s of "waiting for SDK + connect + transfer" on every memory open.
+ */
+
 interface State {
   ready: boolean;
   deviceId: string | null;
@@ -16,15 +43,9 @@ interface State {
   notPremium: boolean;
 }
 
-/**
- * Owns a single Spotify.Player instance for the current tab.
- *
- * play() awaits the SDK's "ready" event internally — so callers may invoke it
- * immediately after mount; the user's single tap doesn't have to coincide with
- * the SDK being ready. play() also uses a fast path (SDK seek + resume) when
- * the requested URI is already loaded, avoiding a REST round-trip.
- */
-export function useSpotifyPlayer() {
+const Ctx = createContext<PlayerCtx | null>(null);
+
+export function SpotifyPlayerProvider({ children }: { children: ReactNode }) {
   const { accessToken, status } = useSpotifyAuth();
   const accessTokenRef = useRef<string | null>(null);
   accessTokenRef.current = accessToken;
@@ -37,7 +58,6 @@ export function useSpotifyPlayer() {
   });
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
-  // A promise that resolves when the SDK fires "ready". Recreated each session.
   const readyPromiseRef = useRef<Promise<void> | null>(null);
   const readyResolveRef = useRef<(() => void) | null>(null);
   const readyRejectRef = useRef<((e: Error) => void) | null>(null);
@@ -78,16 +98,14 @@ export function useSpotifyPlayer() {
             notPremium: false,
           });
           readyResolveRef.current?.();
-          // Pre-warm: silently transfer playback to our device. This makes
-          // Spotify treat us as the active device, so when the user actually
-          // taps play we skip the ~500-1500ms Spotify Connect activation step.
+          // Pre-warm: silently transfer so Spotify treats us as active device.
           const token = accessTokenRef.current;
           if (token) {
             void transferPlayback({
               accessToken: token,
               deviceId: d.device_id,
             }).catch(() => {
-              /* play() has a 404 fallback if this didn't take */
+              /* play() has a 404 fallback */
             });
           }
         });
@@ -149,9 +167,7 @@ export function useSpotifyPlayer() {
     const sdk = playerRef.current;
     if (!token || !deviceId || !sdk) throw new Error("Player hazır değil");
 
-    // Fast path: same URI already loaded → just seek + resume via SDK.
-    // Eliminates a ~300ms REST round-trip on the common "tap pause / tap play"
-    // and "preview the same window again" cases.
+    // Fast path: same URI already loaded → SDK seek + resume (no REST).
     try {
       const cs = await sdk.getCurrentState();
       if (cs && cs.track_window?.current_track?.uri === trackUri) {
@@ -163,16 +179,8 @@ export function useSpotifyPlayer() {
       /* fall through to slow path */
     }
 
-    // Slow path: new URI. Tell Spotify to play directly on our device.
-    // If Spotify can't find an active device (404 NO_ACTIVE_DEVICE), transfer
-    // first then retry.
     const doPlay = () =>
-      startPlayback({
-        accessToken: token,
-        deviceId,
-        trackUri,
-        positionMs,
-      });
+      startPlayback({ accessToken: token, deviceId, trackUri, positionMs });
 
     try {
       await doPlay();
@@ -180,7 +188,6 @@ export function useSpotifyPlayer() {
       const msg = e instanceof Error ? e.message : String(e);
       if (/\b404\b/.test(msg) || /NO_ACTIVE_DEVICE/.test(msg)) {
         await transferPlayback({ accessToken: token, deviceId });
-        // Brief settle so Connect handoff propagates before we retry.
         await new Promise((r) => setTimeout(r, 200));
         await doPlay();
       } else {
@@ -189,17 +196,11 @@ export function useSpotifyPlayer() {
     }
   }
 
-  /**
-   * Call this synchronously inside the user's gesture handler (onClick) to
-   * unlock iOS Safari's autoplay restrictions on the SDK's audio element.
-   * Idempotent and best-effort — silently no-ops if the SDK doesn't expose it
-   * yet (older SDK versions) or the player isn't created.
-   */
   function activateElement(): void {
     const sdk = playerRef.current;
     if (sdk?.activateElement) {
       void sdk.activateElement().catch(() => {
-        /* ignore — Spotify may have already activated it */
+        /* ignore */
       });
     }
   }
@@ -217,7 +218,7 @@ export function useSpotifyPlayer() {
     return s?.position ?? null;
   }
 
-  return {
+  const value: PlayerCtx = {
     ready: state.ready,
     deviceId: state.deviceId,
     error: state.error,
@@ -228,4 +229,17 @@ export function useSpotifyPlayer() {
     getPosition,
     activateElement,
   };
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/** Returns the shared Spotify player. Must be used under SpotifyPlayerProvider. */
+export function useSpotifyPlayer(): PlayerCtx {
+  const ctx = useContext(Ctx);
+  if (!ctx) {
+    throw new Error(
+      "useSpotifyPlayer() must be used inside <SpotifyPlayerProvider>",
+    );
+  }
+  return ctx;
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { MemorySong } from "@/lib/types";
 import { useSpotifyAuth } from "@/lib/useSpotifyAuth";
-import { useSpotifyPlayer } from "@/lib/useSpotifyPlayer";
+import { useSpotifyPlayer } from "@/lib/SpotifyPlayerProvider";
 import { SpotifyConnectCard } from "./SpotifyConnectCard";
 
 interface Props {
