@@ -39,6 +39,10 @@ function SpotifyMemoryMusic({ song }: Props) {
   const [playing, setPlaying] = useState(false);
   const [starting, setStarting] = useState(false);
   const pollRef = useRef<number | null>(null);
+  // Auto-start fires only once per mount, the first time the player is ready.
+  // If the browser blocks autoplay (e.g. iOS Safari without prior gesture),
+  // we silently fall back to manual tap.
+  const autoStartedRef = useRef(false);
 
   const startMs = song.startMs ?? 0;
   const endMs = song.endMs ?? startMs + 15_000;
@@ -92,6 +96,19 @@ function SpotifyMemoryMusic({ song }: Props) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-start when player becomes ready. The user clicked into this page from
+  // the memory list, so most browsers grant playback. If a browser blocks
+  // autoplay (rare on desktop, possible on iOS Safari with strict settings),
+  // start() catches the failure and the chip stays paused for manual tap.
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (!player.ready) return;
+    if (playing || starting) return;
+    autoStartedRef.current = true;
+    void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.ready]);
 
   // Clean up on unmount.
   useEffect(() => {
