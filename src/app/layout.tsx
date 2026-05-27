@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Quicksand } from "next/font/google";
 import "./globals.css";
 import { SpotifyPlayerProvider } from "@/lib/SpotifyPlayerProvider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
+import { TelemetryBoot } from "./_telemetryBoot";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -45,13 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="tr" className={`${playfair.variable} ${quicksand.variable}`}>
       <body className="min-h-dvh">
-        {/*
-          Spotify player provider mounted at the root: the SDK loads + connects
-          + pre-warms as soon as the user has a Spotify refresh token, so by
-          the time they open a memory the player is already ready and playback
-          starts in ~200-500ms instead of 1-3s.
-        */}
+        <TelemetryBoot />
         <SpotifyPlayerProvider>{children}</SpotifyPlayerProvider>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
