@@ -57,3 +57,24 @@ export function isAllowedUid(uid: string | undefined | null): boolean {
   if (allowedUids.length === 0) return true;
   return allowedUids.includes(uid);
 }
+
+/**
+ * Initialize Firebase Performance Monitoring. Lazy-imports the SDK so it
+ * doesn't ship in non-production builds. Safe to call multiple times.
+ *
+ * Call this once from the root layout's client boot.
+ */
+let perfInitStarted = false;
+export function initFirebasePerf(): void {
+  if (perfInitStarted) return;
+  if (typeof window === "undefined") return;
+  if (process.env.NODE_ENV !== "production") return;
+  perfInitStarted = true;
+  void import("firebase/performance")
+    .then(({ getPerformance }) => {
+      getPerformance(firebaseApp());
+    })
+    .catch(() => {
+      perfInitStarted = false; // allow retry on next visit
+    });
+}
