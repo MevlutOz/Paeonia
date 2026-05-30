@@ -12,16 +12,25 @@ interface Props {
   message: Message;
   mine: boolean;
   onOpenImage: (url: string, variants?: PhotoVariants | null) => void;
+  onOpenVideo: (url: string, poster?: string | null) => void;
 }
 
-export function MessageBubble({ message, mine, onOpenImage }: Props) {
-  const isMedia = message.type === "drawing" || message.type === "photo";
+export function MessageBubble({
+  message,
+  mine,
+  onOpenImage,
+  onOpenVideo,
+}: Props) {
+  const isImageMedia = message.type === "drawing" || message.type === "photo";
+  const isVideo = message.type === "video";
   const media = useMedia(
-    isMedia ? message.content : undefined,
+    isImageMedia ? message.content : undefined,
     message.variants,
     "280px",
   );
-  const [revealed, setRevealed] = useState(message.isRevealed || mine);
+  const [revealed, setRevealed] = useState(
+    message.isRevealed || mine || isVideo,
+  );
   const [blushing, setBlushing] = useState(false);
   const blushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,7 +57,7 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
     void toggleFavorite(message.id, !message.isFavorited).catch(() => {});
   }
 
-  function handleMediaTap() {
+  function handleImageTap() {
     // Açılmamış karşı görsel: ilk dokunuş her zaman açar (gecikmesiz).
     if (!revealed && !mine) {
       reveal();
@@ -64,6 +73,20 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
     singleTapTimer.current = setTimeout(() => {
       singleTapTimer.current = null;
       onOpenImage(message.content, message.variants);
+    }, 280);
+  }
+
+  function handleVideoTap() {
+    // Video reveal yok; doğrudan tek/çift tap pattern.
+    if (singleTapTimer.current) {
+      clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = null;
+      favorite();
+      return;
+    }
+    singleTapTimer.current = setTimeout(() => {
+      singleTapTimer.current = null;
+      onOpenVideo(message.content, message.poster);
     }, 280);
   }
 
@@ -100,11 +123,11 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
           <MusicCard url={message.content} mine={mine} />
         )}
 
-        {isMedia && media && (
+        {isImageMedia && media && (
           <div className="relative">
             <button
               type="button"
-              onClick={handleMediaTap}
+              onClick={handleImageTap}
               className={clsx(
                 "relative overflow-hidden shadow-petal block",
                 mine ? "petal-bubble-me" : "petal-bubble-you",
@@ -159,6 +182,62 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
                 <PeonyIcon size={20} glow={message.isFavorited} />
               </button>
             )}
+          </div>
+        )}
+
+        {isVideo && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleVideoTap}
+              className={clsx(
+                "relative overflow-hidden shadow-petal block",
+                mine ? "petal-bubble-me" : "petal-bubble-you",
+                "bg-aphrodite-dark",
+                blushing && "animate-blush",
+              )}
+              style={{ width: "min(72vw, 280px)", aspectRatio: "1 / 1" }}
+              aria-label="Tek dokun: oynat · çift dokun: favori"
+            >
+              {message.poster ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={message.poster}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-aphrodite-dark" />
+              )}
+              <div className="absolute inset-0 grid place-items-center bg-aphrodite-dark/20">
+                <span className="h-14 w-14 grid place-items-center rounded-full bg-white/85 shadow-petal">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M8 5v14l11-7L8 5Z"
+                      fill="currentColor"
+                      className="text-peony-dark"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={favorite}
+              aria-label={message.isFavorited ? "Favoriden çıkar" : "Favorile"}
+              aria-pressed={message.isFavorited}
+              className={clsx(
+                "absolute top-2 right-2 h-9 w-9 grid place-items-center rounded-full transition active:scale-90",
+                message.isFavorited
+                  ? "bg-white/85 shadow-blush-soft"
+                  : "bg-aphrodite-dark/30 backdrop-blur-sm",
+              )}
+            >
+              <PeonyIcon size={20} glow={message.isFavorited} />
+            </button>
           </div>
         )}
 
