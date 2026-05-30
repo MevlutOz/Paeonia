@@ -217,8 +217,124 @@ docs/superpowers/            # tasarım spec'leri + implementasyon planları
 - [x] Kurutulmuş Yapraklar — favori anı albümü
 - [x] Güneş Doğumu — presence + ortak canlı tuval
 - [x] Mırıldanma — Spotify/YouTube şarkı kartları
+- [x] Video mesajları + native kamera capture
 - [ ] Tepki/kalp atışı animasyonu (apollo-gold burst)
-- [ ] Sesli not / kısa video
+- [ ] Sesli not
+
+## Mimari
+
+### 4 katmanlı veri akışı
+
+Saf veri katmanı (`src/lib/*.ts`) dokunulmadı; üstüne üç ince katman eklendi.
+Komponentler artık doğrudan veri katmanına değil hook'lara konuşur.
+
+```
+KOMPONENT (src/app/*, src/components/*)
+   │
+   ▼ React hooks
+useMessages · useLiveCanvas · useMedia    ← src/lib/hooks/
+   │
+   ▼ lifecycle + dedup
+subscriptionRegistry (30s grace, ref-count)  ← src/lib/registry/
+   │
+   ▼ gerçek API çağrıları
+messages.ts · liveCanvas.ts · storage.ts · memories.ts · plans.ts
+   │
+   ▼ yan etki: ölçüm
+telemetry/trace + vitals + events            ← src/lib/telemetry/
+   ↓
+Vercel Speed Insights + Vercel Analytics + Firebase Performance
+```
+
+### Dosya topolojisi
+
+```
+src/lib/
+├─ telemetry/      trace() / vitals / events / reportRouteReady
+├─ registry/       subscriptionRegistry (ref-counted shared subs)
+├─ hooks/          useMessages · useLiveCanvas · useMedia
+├─ firebase.ts     Auth + Firestore + RTDB + Storage init + Perf lazy
+├─ messages.ts     subscribeMessagesPaginated (50/page) · sendMedia (text/drawing/photo/music/video) · markReadBatch
+├─ memories.ts     Memory CRUD + collage
+├─ plans.ts        Plan CRUD
+├─ liveCanvas.ts   RTDB nokta-nokta ortak çizim (onChildAdded/Changed/Removed)
+├─ storage.ts      uploadPhotoVariants · uploadMemoryPhotoVariants · uploadVideo
+├─ usePresence.ts  heartbeat tabanlı çevrimiçi durumu
+├─ links.ts        Spotify/YouTube link tespiti
+├─ fcm.ts          Web push registration
+├─ collage.ts      autoLayout · layoutFitsCount
+└─ SpotifyPlayerProvider · useSpotifyAuth · spotify/player
+
+src/app/
+├─ layout.tsx              TelemetryBoot + SpeedInsights + Analytics (Spotify YOK)
+├─ home/                   4 kart + idle messages prewarm
+├─ chat/                   mesajlar + canvas + lightbox
+├─ memories/
+│  ├─ layout.tsx           SpotifyLazyProvider tüm /memories/* alt ağacını sarar
+│  ├─ page.tsx · new/ · [id]/
+├─ album/                  Kurutulmuş Yapraklar (favori drawing+photo+video)
+├─ plans/ · login/ · auth/spotify/callback / diag/
+
+src/components/
+├─ MessageInput            kamera + galeri + canvas + text
+├─ MessageList → MessageBubble (text | drawing | photo | music | video render)
+├─ Lightbox                kind: "image" | "video"
+├─ CanvasBottomSheet → LiveCanvas
+├─ Collage · CollageTemplatePicker
+├─ SongPicker · SongTrimmer · MemoryMusic · SpotifyConnectCard · MusicCard
+├─ SpotifyLazyProvider     next/dynamic ssr:false
+└─ PeonyIcon · FallingPetals · PeonyDraw
+```
+
+### Auth ve "2 kişi" modeli
+
+Firebase Auth e-posta+şifre, **2 sabit UID whitelist** hem client (`isAllowedUid`)
+hem rules tarafında (`allowedUids()` fonksiyonu `firestore.rules` + `storage.rules` +
+`database.rules.json` üçünde kopyalı) tanımlı. 3. kullanıcı login olsa bile
+rules her şeyi reddediyor.
+
+### Real-time katmanlar
+
+- **Firestore onSnapshot** → mesajlar, anılar, planlar, users (presence)
+- **RTDB onChildAdded/Changed/Removed** → `liveCanvas/strokes` (ortak çizim)
+- **FCM** → mesaj geldiğinde push (Cloud Function `onNewMessage` trigger)
+- **subscriptionRegistry** → /home ↔ /chat geçişlerinde 30s grace ile re-subscribe yok
+
+### Storage path stratejisi
+
+```
+drawings/{uid}/<ts>-<id>.png                          single file (5 MB)
+photos/{uid}/<ts>-<id>-{thumb|medium|full}.jpg       chat foto varyantları (10 MB)
+memories/{uid}/<ts>-<id>-{thumb|medium|full}.jpg     anı foto varyantları (12 MB, delete açık)
+videos/{uid}/<ts>-<id>.{mp4} + -poster.jpg           video + ilk frame jpeg (25 MB)
+```
+
+### Mesaj veri akışı — örnek: video gönderme
+
+```
+Kullanıcı kamera butonu
+  │
+  ▼
+MessageInput → handleFile (file.type'a göre route)
+  │
+  ▼
+chat/page.tsx::handleVideo
+  ├─ uploadVideo(uid, file)
+  │   ├─ size + mime validate (25 MB)
+  │   ├─ extractVideoPoster (<video> + canvas → jpeg blob)
+  │   ├─ Promise.all → videos/<uid>/<ts>-<id>.mp4 + -poster.jpg
+  │   └─ trace("video.upload", ..., {sizeKb}) → Firebase Performance
+  │
+  ▼
+sendMedia(uid, videoUrl, "video", null, posterUrl) → Firestore addDoc
+   (rules: type whitelist + senderId == auth.uid)
+  │
+  ▼ real-time
+useMessages hook → subscriptionRegistry shared snapshot
+  → docToMessage (poster + variants okur)
+  → MessageList → MessageBubble (isVideo branch — poster + ▶ overlay)
+  → Tek tap → onOpenVideo → Lightbox kind="video" (<video controls autoPlay>)
+```
 
 ## Performans
 
@@ -234,31 +350,28 @@ Budget: **First-load JS gzip ≤ 320 kB / route** (regresyon koruması; mutlak
 ideal değil, mevcut en büyük route + ~5% headroom). Firebase + Next + Framer
 runtime tabanı ~90 kB'tan başlıyor, route'lar tipik 250-305 kB aralığında.
 
-### Mimari
+### Yapılmış iyileştirmeler (6-fazlı initiative — 2026-05-28→30)
 
-Veri katmanı dokunulmadı; üstüne ince bir kaplama kuruldu:
+| Faz | Ne yapıldı | Etki |
+|-----|-----------|------|
+| 1 | Telemetri tabanı (Vercel Speed Insights + Analytics + Firebase Perf + web-vitals) | Ölçüm altyapısı |
+| 2 | `subscriptionRegistry` + `useMessages` + paginated subscribe (50/page) + `markReadBatch` | /chat ilk yük 200→50 doc, /home↔/chat re-subscribe yok |
+| 3 | `liveCanvas`: `onValue` → `onChildRemoved`, `useLiveCanvas` rAF batching | RTDB subtree-wide payload yok, 30+ peer stroke tek frame |
+| 4 | Foto 3 varyant (thumb 300 / medium 800 / full 1800) + `useMedia` srcSet | Mobilde ~30x daha az byte/foto |
+| 5 | Spotify SDK root'tan kaldırıldı (`/memories/layout` altında lazy) + /home idle prewarm | /home/chat/album/plans SDK script çekmiyor |
+| 6 | `scripts/perf-budget.mjs` + 320 kB/route budget + bu Performans bölümü | Regresyon koruma |
 
-```
-src/lib/
-├─ telemetry/   ← trace() / vitals / reportRouteReady — Vercel Speed Insights + Firebase Perf relay
-├─ registry/    ← subscriptionRegistry (dedup + 30s grace unsubscribe)
-├─ hooks/       ← useMessages, useLiveCanvas, useMedia — shared subscription + rAF batching
-├─ messages.ts  ← + subscribeMessagesPaginated (50/page), + markReadBatch
-├─ liveCanvas.ts ← onValue düşürüldü, onChildRemoved (peer clear için)
-├─ storage.ts   ← + uploadPhotoVariants / uploadMemoryPhotoVariants (thumb 300px / medium 800px / full 1800px)
-└─ SpotifyPlayerProvider ← /app/memories/layout.tsx altında lazy (root'tan kaldırıldı)
-```
-
-Detay: `docs/superpowers/specs/2026-05-28-performance-architecture-design.md`
+Spec + plan: `docs/superpowers/specs/2026-05-28-performance-architecture-design.md`
 + `docs/superpowers/plans/2026-05-28-performance-architecture.md`.
 
 ### Bilinen borçlar
 
-- **Foto silme orphan**: foto silindiğinde sadece `full` siliniyor;
-  `thumb` + `medium` storage'da kalıyor. Çözüm: silme yollarında 3 path'i
-  de sil (`memories.ts` ve mesaj silme akışları).
-- **Firestore compound index**: `orderBy + where("senderId", "==", X)`
-  kombinasyonları compound index gerektirebilir. Henüz hata veren
-  sorgu yok; bir audit yapılmalı.
-- **Test altyapısı**: Vitest + RTL yok. `subscriptionRegistry` ve
-  `useMessages` için unit test yazılması faydalı olur.
+- **Foto/video silme orphan**: silinen `full` varyantın `thumb`/`medium`/`-poster.jpg`
+  storage'da kalıyor. Çözüm: silme yollarında 3-4 path'i de sil.
+- **Firestore compound index**: `orderBy + where` kombinasyonları compound index
+  gerektirebilir. Henüz hata veren sorgu yok; bir audit yapılmalı.
+- **Test altyapısı yok**: Vitest + RTL setup yapılmadı; doğrulama `tsc + build + manuel smoke`.
+- **3 yerde UID whitelist** (`firestore.rules`, `storage.rules`, `database.rules.json` +
+  client `isAllowedUid`) — değiştirmek 4 yerde sync gerekir.
+- **Firebase kuralları Vercel deploy'a dahil değil** — `firebase deploy --only firestore:rules,storage`
+  ayrıca çalıştırılır.
