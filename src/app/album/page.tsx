@@ -13,7 +13,41 @@ import { PeonyIcon } from "@/components/PeonyIcon";
 import { Lightbox } from "@/components/Lightbox";
 
 function FavoriteThumb({ message }: { message: Message }) {
-  const media = useMedia(message.content, message.variants, "(max-width: 768px) 45vw, 200px");
+  const isVideo = message.type === "video";
+  const media = useMedia(
+    isVideo ? undefined : message.content,
+    message.variants,
+    "(max-width: 768px) 45vw, 200px",
+  );
+
+  if (isVideo) {
+    return (
+      <>
+        {message.poster ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={message.poster}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-aphrodite-dark" />
+        )}
+        <span className="absolute bottom-1 right-1 h-7 w-7 grid place-items-center rounded-full bg-white/85 shadow-blush-soft">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M8 5v14l11-7L8 5Z"
+              fill="currentColor"
+              className="text-peony-dark"
+            />
+          </svg>
+        </span>
+      </>
+    );
+  }
+
   if (!media) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -34,7 +68,12 @@ export default function AlbumPage() {
   const [user, setUser] = useState<User | null>(null);
   const [checked, setChecked] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    kind: "image" | "video";
+    url: string;
+    variants?: PhotoVariants | null;
+    poster?: string | null;
+  } | null>(null);
   const routeReadyFired = useRef(false);
 
   useEffect(() => {
@@ -72,8 +111,26 @@ export default function AlbumPage() {
   if (!user) return null;
 
   const favorites = messages.filter(
-    (m) => m.isFavorited && (m.type === "drawing" || m.type === "photo"),
+    (m) =>
+      m.isFavorited &&
+      (m.type === "drawing" || m.type === "photo" || m.type === "video"),
   );
+
+  function openFavorite(m: Message) {
+    if (m.type === "video") {
+      setLightbox({
+        kind: "video",
+        url: m.content,
+        poster: m.poster,
+      });
+    } else {
+      setLightbox({
+        kind: "image",
+        url: m.content,
+        variants: m.variants,
+      });
+    }
+  }
 
   return (
     <main className="album-parchment relative mx-auto max-w-xl min-h-dvh flex flex-col">
@@ -110,7 +167,8 @@ export default function AlbumPage() {
               Albüm henüz boş
             </p>
             <p className="text-sm mt-2">
-              Sohbette bir çizime ya da fotoğrafa çift dokun — burada preslensin.
+              Sohbette bir çizime, fotoğrafa veya videoya çift dokun — burada
+              preslensin.
             </p>
           </div>
         </div>
@@ -125,7 +183,7 @@ export default function AlbumPage() {
               >
                 <button
                   type="button"
-                  onClick={() => setLightbox({ url: m.content, variants: m.variants })}
+                  onClick={() => openFavorite(m)}
                   className="relative block w-full overflow-hidden"
                   style={{ aspectRatio: "1 / 1" }}
                   aria-label="Büyüt"
@@ -156,7 +214,9 @@ export default function AlbumPage() {
 
       <Lightbox
         url={lightbox?.url ?? null}
+        kind={lightbox?.kind ?? "image"}
         variants={lightbox?.variants ?? null}
+        poster={lightbox?.poster ?? null}
         onClose={() => setLightbox(null)}
       />
     </main>
