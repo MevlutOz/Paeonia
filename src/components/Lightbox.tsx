@@ -2,14 +2,19 @@
 
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { PhotoVariants } from "@/lib/types";
+import { useMedia } from "@/lib/hooks/useMedia";
 import { PeonyIcon } from "./PeonyIcon";
 
 interface Props {
   url: string | null;
+  variants?: PhotoVariants | null;
   onClose: () => void;
 }
 
-export function Lightbox({ url, onClose }: Props) {
+export function Lightbox({ url, variants, onClose }: Props) {
+  const media = useMedia(url ?? undefined, variants);
+
   useEffect(() => {
     if (!url) return;
     function onKey(e: KeyboardEvent) {
@@ -25,7 +30,7 @@ export function Lightbox({ url, onClose }: Props) {
 
   return (
     <AnimatePresence>
-      {url && (
+      {url && media && (
         <motion.div
           className="fixed inset-0 z-[60] grid place-items-center p-4 bg-aphrodite-dark/85 backdrop-blur-md"
           initial={{ opacity: 0 }}
@@ -60,7 +65,7 @@ export function Lightbox({ url, onClose }: Props) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={url}
+              src={media.fullSrc}
               alt=""
               className="max-w-[94vw] max-h-[82vh] object-contain rounded-3xl shadow-blush"
             />

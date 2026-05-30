@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthUser } from "@/lib/useAuthUser";
 import { createMemory } from "@/lib/memories";
-import { uploadMemoryPhoto } from "@/lib/storage";
+import { uploadMemoryPhotoVariants } from "@/lib/storage";
 import { todayIso } from "@/lib/format";
 import type { MemorySong } from "@/lib/types";
 import { SongPicker } from "@/components/SongPicker";
@@ -77,10 +77,11 @@ export default function NewMemoryPage() {
     }
     setSaving(true);
     try {
-      const photos: { url: string; path: string }[] = [];
+      const photos: { url: string; path: string; variants: Awaited<ReturnType<typeof uploadMemoryPhotoVariants>>["variants"] }[] = [];
       for (let i = 0; i < items.length; i++) {
         setProgress(`Fotoğraflar yükleniyor… ${i + 1}/${items.length}`);
-        photos.push(await uploadMemoryPhoto(user.uid, items[i].file));
+        const { url, path, variants } = await uploadMemoryPhotoVariants(user.uid, items[i].file);
+        photos.push({ url, path, variants });
       }
       setProgress("Anı kaydediliyor…");
       const id = await createMemory({

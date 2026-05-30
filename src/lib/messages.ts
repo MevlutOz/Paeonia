@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { trace } from "./telemetry/trace";
-import type { Message, MessageType } from "./types";
+import type { Message, MessageType, PhotoVariants } from "./types";
 import { detectMusicLink } from "./links";
 
 const MESSAGES = "messages";
@@ -70,11 +70,13 @@ export async function sendMedia(
   senderId: string,
   url: string,
   type: "drawing" | "photo",
+  variants?: PhotoVariants | null,
 ) {
   await addDoc(collection(firestore(), MESSAGES), {
     senderId,
     type,
     content: url,
+    ...(variants ? { variants } : {}),
     createdAt: serverTimestamp(),
     isRead: false,
     isRevealed: false,
@@ -121,6 +123,7 @@ function docToMessage(d: QueryDocumentSnapshot | DocumentSnapshot): Message {
     senderId: (data?.senderId as string) ?? "",
     type: (data?.type as MessageType) ?? "text",
     content: (data?.content as string) ?? "",
+    variants: (data?.variants as PhotoVariants | undefined) ?? null,
     createdAt: (data?.createdAt as Message["createdAt"]) ?? null,
     isRead: !!data?.isRead,
     isRevealed: !!data?.isRevealed,

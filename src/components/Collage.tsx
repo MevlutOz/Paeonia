@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import type { CollageLayout, MemoryPhoto } from "@/lib/types";
+import { useMedia } from "@/lib/hooks/useMedia";
 
 interface Props {
   photos: MemoryPhoto[];
@@ -10,6 +11,24 @@ interface Props {
   selectedIndex?: number | null;
   onCellTap?: (index: number) => void;
   onCellOpen?: (index: number) => void;
+}
+
+function CollageCellImage({ photo }: { photo: MemoryPhoto }) {
+  const media = useMedia(photo.url, photo.variants, "(max-width: 768px) 50vw, 300px");
+  if (!media) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={media.src}
+      srcSet={media.srcSet || undefined}
+      sizes={media.sizes}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="w-full h-full object-cover"
+      draggable={false}
+    />
+  );
 }
 
 export function Collage({
@@ -63,13 +82,7 @@ export function Collage({
               gridRow: `${cell.row} / span ${cell.rowSpan}`,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo.url}
-              alt=""
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
+            <CollageCellImage photo={photo} />
             {selecting && (
               <span className="absolute bottom-1 left-1 h-5 w-5 grid place-items-center rounded-full bg-aphrodite-dark/65 text-white text-[10px] font-semibold">
                 {i + 1}

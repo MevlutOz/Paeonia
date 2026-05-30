@@ -11,7 +11,8 @@ import {
   sendMedia,
   markAllReadFrom,
 } from "@/lib/messages";
-import { uploadDataUrl, uploadPhoto } from "@/lib/storage";
+import { uploadDataUrl, uploadPhotoVariants } from "@/lib/storage";
+import type { PhotoVariants } from "@/lib/types";
 import { maybeRegisterFcm } from "@/lib/fcm";
 import { useMessages } from "@/lib/hooks/useMessages";
 import { reportRouteReady } from "@/lib/telemetry/events";
@@ -27,7 +28,7 @@ export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
   const { messages, loading } = useMessages();
   const [canvasOpen, setCanvasOpen] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const fcmAsked = useRef(false);
   const routeReadyFired = useRef(false);
@@ -83,8 +84,8 @@ export default function ChatPage() {
   async function handlePhoto(file: File) {
     if (!user) return;
     try {
-      const url = await uploadPhoto(user.uid, file);
-      await sendMedia(user.uid, url, "photo");
+      const variants = await uploadPhotoVariants(user.uid, file);
+      await sendMedia(user.uid, variants.full, "photo", variants);
     } catch (e) {
       console.error("[photo] upload failed:", e);
       alert("Fotoğraf gönderilemedi. Tekrar dene.");
@@ -146,7 +147,7 @@ export default function ChatPage() {
       <MessageList
         messages={messages}
         currentUserId={user.uid}
-        onOpenImage={setLightboxUrl}
+        onOpenImage={(url, variants) => setLightbox({ url, variants })}
       />
 
       <MessageInput
@@ -163,7 +164,11 @@ export default function ChatPage() {
         uid={user.uid}
       />
 
-      <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      <Lightbox
+        url={lightbox?.url ?? null}
+        variants={lightbox?.variants ?? null}
+        onClose={() => setLightbox(null)}
+      />
     </main>
   );
 }

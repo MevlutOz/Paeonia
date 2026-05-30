@@ -2,6 +2,9 @@
 
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "./firebase";
+import type { PhotoVariants } from "./types";
+
+export type { PhotoVariants };
 
 export async function uploadDataUrl(
   uid: string,
@@ -91,3 +94,53 @@ function cryptoId(): string {
   }
   return Math.random().toString(36).slice(2, 10);
 }
+
+async function uploadVariantsAt(
+  basePath: string,
+  file: File,
+): Promise<PhotoVariants> {
+  const [thumbBlob, mediumBlob, fullBlob] = await Promise.all([
+    resizeImage(file, 300, 0.78),
+    resizeImage(file, 800, 0.82),
+    resizeImage(file, 1800, 0.85),
+  ]);
+  const [thumb, medium, full] = await Promise.all([
+    uploadAt(`${basePath}-thumb.jpg`, thumbBlob),
+    uploadAt(`${basePath}-medium.jpg`, mediumBlob),
+    uploadAt(`${basePath}-full.jpg`, fullBlob),
+  ]);
+  return { thumb, medium, full };
+}
+
+async function uploadAt(path: string, blob: Blob): Promise<string> {
+  const ref = storageRef(firebaseStorage(), path);
+  await uploadBytes(ref, blob, { contentType: blob.type || "image/jpeg" });
+  return getDownloadURL(ref);
+}
+
+/**
+ * Upload a chat photo as three resolutions under /photos/{uid}/. Callers
+ * store only the `full` URL in Firestore; render code derives thumb/medium
+ * via `photoVariantUrl()`.
+ */
+export async function uploadPhotoVariants(uid: string, file: File): Promise<PhotoVariants> {
+  const base = `photos/${uid}/${Date.now()}-${cryptoId()}`;
+  return uploadVariantsAt(base, file);
+}
+
+/**
+ * Upload a memory photo as three resolutions under /memories/{uid}/. Returns
+ * the variant URLs plus the `path` of the `full` variant for delete bookkeeping.
+ *
+ * Known debt: deleting the path only removes the -full.jpg; -thumb.jpg and
+ * -medium.jpg become orphans. Tracked in Faz 6 docs.
+ */
+export async function uploadMemoryPhotoVariants(
+  uid: string,
+  file: File,
+): Promise<{ url: string; path: string; variants: PhotoVariants }> {
+  const base = `memories/${uid}/${Date.now()}-${cryptoId()}`;
+  const variants = await uploadVariantsAt(base, file);
+  return { url: variants.full, path: `${base}-full.jpg`, variants };
+}
+
