@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type MessageType = "text" | "drawing" | "photo" | "music";
+export type MessageType = "text" | "drawing" | "photo" | "music" | "video";
 
 export interface PhotoVariants {
   thumb: string;  // 300px
@@ -24,6 +24,8 @@ export interface Message {
   content: string;
   /** Present for `type === "photo"` uploads from Faz 4 onwards. Legacy photos are null. */
   variants?: PhotoVariants | null;
+  /** Present for `type === "video"` uploads. Poster (cover) image URL. Legacy/extraction-failed videos are null. */
+  poster?: string | null;
   createdAt: Timestamp | null;
   isRead: boolean;
   isRevealed: boolean;
