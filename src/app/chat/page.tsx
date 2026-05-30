@@ -7,14 +7,14 @@ import type { User } from "firebase/auth";
 import { onUser, signOut } from "@/lib/auth";
 import { isAllowedUid } from "@/lib/firebase";
 import {
-  subscribeMessages,
   sendText,
   sendMedia,
   markAllReadFrom,
 } from "@/lib/messages";
 import { uploadDataUrl, uploadPhoto } from "@/lib/storage";
 import { maybeRegisterFcm } from "@/lib/fcm";
-import type { Message } from "@/lib/types";
+import { useMessages } from "@/lib/hooks/useMessages";
+import { reportRouteReady } from "@/lib/telemetry/events";
 import { MessageList } from "@/components/MessageList";
 import { MessageInput } from "@/components/MessageInput";
 import { CanvasBottomSheet } from "@/components/CanvasBottomSheet";
@@ -25,11 +25,12 @@ import { usePresence } from "@/lib/usePresence";
 export default function ChatPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, loading } = useMessages();
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const fcmAsked = useRef(false);
+  const routeReadyFired = useRef(false);
   const { partnerOnline } = usePresence(user?.uid ?? null);
 
   useEffect(() => {
@@ -45,10 +46,11 @@ export default function ChatPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = subscribeMessages((m) => setMessages(m));
-    return () => unsub();
-  }, [user]);
+    if (!loading && !routeReadyFired.current) {
+      routeReadyFired.current = true;
+      reportRouteReady("chat");
+    }
+  }, [loading]);
 
   // Mark incoming as read whenever new arrives
   useEffect(() => {
