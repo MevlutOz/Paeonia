@@ -7,9 +7,10 @@ import {
   remove,
   onChildAdded,
   onChildChanged,
-  onValue,
+  onChildRemoved,
 } from "firebase/database";
 import { realtimeDb } from "./firebase";
+import { trace } from "./telemetry/trace";
 
 export interface LivePoint {
   x: number; // 0–1 normalize
@@ -44,17 +45,22 @@ export function newStroke(stroke: LiveStroke): {
 
 /** Tüm ortak tuvali temizler (iki tarafta da). */
 export function clearLiveCanvas(): Promise<void> {
-  return remove(ref(realtimeDb(), ROOT));
+  return trace("liveCanvas.clear", () => remove(ref(realtimeDb(), ROOT)));
 }
 
 /**
- * Ortak tuvali dinler. onAdd/onChange çizgi geldikçe/değiştikçe, onClear ise
- * tüm düğüm silindiğinde tetiklenir. Aboneliği iptal eden fonksiyon döner.
+ * Ortak tuvali dinler.
+ *
+ * Değişiklik (Faz 3): `onValue` kaldırıldı — daha önce her stroke
+ * güncellemesinde TÜM subtree'yi tekrar getiriyordu. Artık `onChildRemoved`
+ * ile düğüm silinmesini dinliyoruz; parent ROOT silinince RTDB her child
+ * için ayrı bir `onChildRemoved` fırlatır, bu sayede peer-side clear/undo
+ * tek tip kanalla geliyor.
  */
 export function subscribeLiveCanvas(handlers: {
   onAdd: (id: string, s: LiveStroke) => void;
   onChange: (id: string, s: LiveStroke) => void;
-  onClear: () => void;
+  onRemove: (id: string) => void;
 }): () => void {
   const r = ref(realtimeDb(), ROOT);
   const u1 = onChildAdded(r, (snap) =>
@@ -63,9 +69,9 @@ export function subscribeLiveCanvas(handlers: {
   const u2 = onChildChanged(r, (snap) =>
     handlers.onChange(snap.key as string, snap.val() as LiveStroke),
   );
-  const u3 = onValue(r, (snap) => {
-    if (!snap.exists()) handlers.onClear();
-  });
+  const u3 = onChildRemoved(r, (snap) =>
+    handlers.onRemove(snap.key as string),
+  );
   return () => {
     u1();
     u2();
