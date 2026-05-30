@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "perf:budget": "node scripts/perf-budget.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

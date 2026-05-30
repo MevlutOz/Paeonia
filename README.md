@@ -219,3 +219,46 @@ docs/superpowers/            # tasarım spec'leri + implementasyon planları
 - [x] Mırıldanma — Spotify/YouTube şarkı kartları
 - [ ] Tepki/kalp atışı animasyonu (apollo-gold burst)
 - [ ] Sesli not / kısa video
+
+## Performans
+
+Üretim metrikleri Vercel Speed Insights + Firebase Performance Monitoring
+üzerinden izlenir. Lokalde bundle bütçesini kontrol etmek için:
+
+```bash
+npm run build
+npm run perf:budget
+```
+
+Budget: **First-load JS gzip ≤ 320 kB / route** (regresyon koruması; mutlak
+ideal değil, mevcut en büyük route + ~5% headroom). Firebase + Next + Framer
+runtime tabanı ~90 kB'tan başlıyor, route'lar tipik 250-305 kB aralığında.
+
+### Mimari
+
+Veri katmanı dokunulmadı; üstüne ince bir kaplama kuruldu:
+
+```
+src/lib/
+├─ telemetry/   ← trace() / vitals / reportRouteReady — Vercel Speed Insights + Firebase Perf relay
+├─ registry/    ← subscriptionRegistry (dedup + 30s grace unsubscribe)
+├─ hooks/       ← useMessages, useLiveCanvas, useMedia — shared subscription + rAF batching
+├─ messages.ts  ← + subscribeMessagesPaginated (50/page), + markReadBatch
+├─ liveCanvas.ts ← onValue düşürüldü, onChildRemoved (peer clear için)
+├─ storage.ts   ← + uploadPhotoVariants / uploadMemoryPhotoVariants (thumb 300px / medium 800px / full 1800px)
+└─ SpotifyPlayerProvider ← /app/memories/layout.tsx altında lazy (root'tan kaldırıldı)
+```
+
+Detay: `docs/superpowers/specs/2026-05-28-performance-architecture-design.md`
++ `docs/superpowers/plans/2026-05-28-performance-architecture.md`.
+
+### Bilinen borçlar
+
+- **Foto silme orphan**: foto silindiğinde sadece `full` siliniyor;
+  `thumb` + `medium` storage'da kalıyor. Çözüm: silme yollarında 3 path'i
+  de sil (`memories.ts` ve mesaj silme akışları).
+- **Firestore compound index**: `orderBy + where("senderId", "==", X)`
+  kombinasyonları compound index gerektirebilir. Henüz hata veren
+  sorgu yok; bir audit yapılmalı.
+- **Test altyapısı**: Vitest + RTL yok. `subscriptionRegistry` ve
+  `useMessages` için unit test yazılması faydalı olur.
