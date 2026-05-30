@@ -43,6 +43,20 @@ service firebase.storage {
       allow delete: if isInvited();
     }
 
+    // Chat videos: file + sibling poster.jpg. 25 MB limit covers both
+    // (poster is ~50-200 KB so the video drives the limit).
+    match /videos/{uid}/{file=**} {
+      allow read: if isInvited();
+      allow write: if isInvited()
+        && request.auth.uid == uid
+        && request.resource.size < 25 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('video/.*')
+          || request.resource.contentType == 'image/jpeg'
+        );
+      allow delete: if false;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }
