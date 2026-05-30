@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuthUser } from "@/lib/useAuthUser";
 import { subscribeMemories } from "@/lib/memories";
 import { formatMemoryDate } from "@/lib/format";
+import { reportRouteReady } from "@/lib/telemetry/events";
 import type { Memory } from "@/lib/types";
 import { PeonyIcon } from "@/components/PeonyIcon";
 
@@ -23,6 +24,10 @@ export default function MemoriesPage() {
     });
     return () => unsub();
   }, [user]);
+
+  useEffect(() => {
+    if (loaded) reportRouteReady("memories");
+  }, [loaded]);
 
   if (!checked) {
     return (

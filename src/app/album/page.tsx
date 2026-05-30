@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { onUser } from "@/lib/auth";
 import { isAllowedUid } from "@/lib/firebase";
 import { subscribeMessages, toggleFavorite } from "@/lib/messages";
+import { reportRouteReady } from "@/lib/telemetry/events";
 import type { Message, PhotoVariants } from "@/lib/types";
 import { useMedia } from "@/lib/hooks/useMedia";
 import { PeonyIcon } from "@/components/PeonyIcon";
@@ -34,6 +35,7 @@ export default function AlbumPage() {
   const [checked, setChecked] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
+  const routeReadyFired = useRef(false);
 
   useEffect(() => {
     const unsub = onUser((u) => {
@@ -51,6 +53,13 @@ export default function AlbumPage() {
     if (!user) return;
     const unsub = subscribeMessages((m) => setMessages(m));
     return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !routeReadyFired.current) {
+      routeReadyFired.current = true;
+      reportRouteReady("album");
+    }
   }, [user]);
 
   if (!checked) {
