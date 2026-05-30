@@ -6,8 +6,8 @@ import {
   type LiveStroke,
   newStroke,
   clearLiveCanvas,
-  subscribeLiveCanvas,
 } from "@/lib/liveCanvas";
+import { useLiveCanvas } from "@/lib/hooks/useLiveCanvas";
 
 interface Props {
   uid: string;
@@ -77,7 +77,7 @@ export function LiveCanvas({ uid, onSend, onClose }: Props) {
     });
   }, []);
 
-  // Canvas kurulumu + RTDB aboneliği.
+  // Canvas kurulumu (DPR + initial redraw).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -91,25 +91,24 @@ export function LiveCanvas({ uid, onSend, onClose }: Props) {
     ctxRef.current = ctx;
     sizeRef.current = { w: rect.width, h: rect.height };
     redraw();
-
-    const unsub = subscribeLiveCanvas({
-      onAdd: (id, s) => {
-        if (id === activeId.current) return; // kendi aktif çizgim — yerelde çiziliyor
-        strokesRef.current.set(id, s);
-        redraw();
-      },
-      onChange: (id, s) => {
-        if (id === activeId.current) return;
-        strokesRef.current.set(id, s);
-        redraw();
-      },
-      onClear: () => {
-        strokesRef.current.clear();
-        redraw();
-      },
-    });
-    return () => unsub();
   }, [redraw]);
+
+  // RTDB aboneliği — rAF-batched, frame başına tek redraw.
+  useLiveCanvas({
+    onUpsert: (id, s) => {
+      if (id === activeId.current) return; // kendi aktif çizgim — yerelde çiziliyor
+      strokesRef.current.set(id, s);
+      redraw();
+    },
+    onRemove: (id) => {
+      strokesRef.current.delete(id);
+      redraw();
+    },
+    onAllCleared: () => {
+      strokesRef.current.clear();
+      redraw();
+    },
+  });
 
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
     const rect = canvasRef.current!.getBoundingClientRect();
