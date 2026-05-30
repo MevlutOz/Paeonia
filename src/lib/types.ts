@@ -2,6 +2,12 @@ import type { Timestamp } from "firebase/firestore";
 
 export type MessageType = "text" | "drawing" | "photo" | "music";
 
+export interface PhotoVariants {
+  thumb: string;  // 300px
+  medium: string; // 800px
+  full: string;   // 1800px
+}
+
 export interface PaeoniaUser {
   uid: string;
   displayName: string;
@@ -16,6 +22,8 @@ export interface Message {
   senderId: string;
   type: MessageType;
   content: string;
+  /** Present for `type === "photo"` uploads from Faz 4 onwards. Legacy photos are null. */
+  variants?: PhotoVariants | null;
   createdAt: Timestamp | null;
   isRead: boolean;
   isRevealed: boolean;
@@ -25,6 +33,8 @@ export interface Message {
 export interface MemoryPhoto {
   url: string;
   path: string;
+  /** Present from Faz 4 onwards. Legacy memory photos are undefined. */
+  variants?: PhotoVariants | null;
 }
 
 export interface CollageCell {

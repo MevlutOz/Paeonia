@@ -2,6 +2,9 @@
 
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "./firebase";
+import type { PhotoVariants } from "./types";
+
+export type { PhotoVariants };
 
 export async function uploadDataUrl(
   uid: string,
@@ -92,12 +95,6 @@ function cryptoId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export interface PhotoVariants {
-  thumb: string;  // 300px URL
-  medium: string; // 800px URL
-  full: string;   // 1800px URL
-}
-
 async function uploadVariantsAt(
   basePath: string,
   file: File,
@@ -147,13 +144,3 @@ export async function uploadMemoryPhotoVariants(
   return { url: variants.full, path: `${base}-full.jpg`, variants };
 }
 
-/**
- * Given any variant URL (or a legacy single-variant URL), return the URL for
- * the requested size. Legacy URLs without the variant suffix are returned
- * unchanged (graceful fallback).
- */
-export function photoVariantUrl(url: string, size: "thumb" | "medium" | "full"): string {
-  const m = url.match(/(-thumb|-medium|-full)\.jpg/);
-  if (!m) return url;
-  return url.replace(m[0], `-${size}.jpg`);
-}

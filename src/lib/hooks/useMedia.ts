@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { getVariants } from "../registry/mediaCache";
+import type { PhotoVariants } from "../types";
 
 interface MediaSources {
   src: string;
@@ -9,40 +9,39 @@ interface MediaSources {
   sizes: string;
   placeholderSrc: string;
   fullSrc: string;
-  /** True if the URL follows the variant naming convention. */
   hasVariants: boolean;
 }
 
 /**
- * Returns ready-to-use <img> attributes for a photo URL. Falls back cleanly
- * for legacy uploads (single URL, no srcSet) so old chat/memory photos still
- * render.
+ * Returns ready-to-use <img> attributes for a photo. Pass `variants` (the
+ * thumb/medium/full URLs uploaded via uploadPhotoVariants) for srcSet-based
+ * responsive loading; legacy uploads (no variants) fall back to a single src.
  */
 export function useMedia(
   url: string | undefined,
+  variants?: PhotoVariants | null,
   sizes = "(max-width: 768px) 100vw, 800px",
 ): MediaSources | null {
   return useMemo(() => {
-    if (!url) return null;
-    const v = getVariants(url);
-    const hasVariants = v.thumb !== url || v.medium !== url || v.full !== url;
-    if (!hasVariants) {
+    if (!url && !variants) return null;
+    if (variants) {
       return {
-        src: url,
-        srcSet: "",
+        src: variants.medium,
+        srcSet: `${variants.thumb} 300w, ${variants.medium} 800w, ${variants.full} 1800w`,
         sizes,
-        placeholderSrc: url,
-        fullSrc: url,
-        hasVariants: false,
+        placeholderSrc: variants.thumb,
+        fullSrc: variants.full,
+        hasVariants: true,
       };
     }
+    const u = url as string;
     return {
-      src: v.medium,
-      srcSet: `${v.thumb} 300w, ${v.medium} 800w, ${v.full} 1800w`,
+      src: u,
+      srcSet: "",
       sizes,
-      placeholderSrc: v.thumb,
-      fullSrc: v.full,
-      hasVariants: true,
+      placeholderSrc: u,
+      fullSrc: u,
+      hasVariants: false,
     };
-  }, [url, sizes]);
+  }, [url, variants, sizes]);
 }

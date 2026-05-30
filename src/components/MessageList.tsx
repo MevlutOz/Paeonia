@@ -2,12 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { MessageBubble } from "./MessageBubble";
-import type { Message } from "@/lib/types";
+import type { Message, PhotoVariants } from "@/lib/types";
 
 interface Props {
   messages: Message[];
   currentUserId: string;
-  onOpenImage: (url: string) => void;
+  onOpenImage: (url: string, variants?: PhotoVariants | null) => void;
 }
 
 export function MessageList({ messages, currentUserId, onOpenImage }: Props) {

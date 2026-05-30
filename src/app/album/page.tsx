@@ -2,21 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { User } from "firebase/auth";
 import { onUser } from "@/lib/auth";
 import { isAllowedUid } from "@/lib/firebase";
 import { subscribeMessages, toggleFavorite } from "@/lib/messages";
-import type { Message } from "@/lib/types";
+import type { Message, PhotoVariants } from "@/lib/types";
+import { useMedia } from "@/lib/hooks/useMedia";
 import { PeonyIcon } from "@/components/PeonyIcon";
 import { Lightbox } from "@/components/Lightbox";
+
+function FavoriteThumb({ message }: { message: Message }) {
+  const media = useMedia(message.content, message.variants, "(max-width: 768px) 45vw, 200px");
+  if (!media) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={media.src}
+      srcSet={media.srcSet || undefined}
+      sizes={media.sizes}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="absolute inset-0 w-full h-full object-cover"
+    />
+  );
+}
 
 export default function AlbumPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [checked, setChecked] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
 
   useEffect(() => {
     const unsub = onUser((u) => {
@@ -99,19 +116,12 @@ export default function AlbumPage() {
               >
                 <button
                   type="button"
-                  onClick={() => setLightboxUrl(m.content)}
+                  onClick={() => setLightbox({ url: m.content, variants: m.variants })}
                   className="relative block w-full overflow-hidden"
                   style={{ aspectRatio: "1 / 1" }}
                   aria-label="Büyüt"
                 >
-                  <Image
-                    src={m.content}
-                    alt=""
-                    fill
-                    sizes="200px"
-                    className="object-cover"
-                    unoptimized
-                  />
+                  <FavoriteThumb message={m} />
                 </button>
                 <button
                   type="button"
@@ -135,7 +145,11 @@ export default function AlbumPage() {
         </div>
       )}
 
-      <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      <Lightbox
+        url={lightbox?.url ?? null}
+        variants={lightbox?.variants ?? null}
+        onClose={() => setLightbox(null)}
+      />
     </main>
   );
 }

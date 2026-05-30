@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import clsx from "clsx";
-import type { Message } from "@/lib/types";
+import type { Message, PhotoVariants } from "@/lib/types";
+import { useMedia } from "@/lib/hooks/useMedia";
 import { PeonyIcon } from "./PeonyIcon";
 import { MusicCard } from "./MusicCard";
 import { markRevealed, toggleFavorite } from "@/lib/messages";
@@ -11,11 +11,16 @@ import { markRevealed, toggleFavorite } from "@/lib/messages";
 interface Props {
   message: Message;
   mine: boolean;
-  onOpenImage: (url: string) => void;
+  onOpenImage: (url: string, variants?: PhotoVariants | null) => void;
 }
 
 export function MessageBubble({ message, mine, onOpenImage }: Props) {
   const isMedia = message.type === "drawing" || message.type === "photo";
+  const media = useMedia(
+    isMedia ? message.content : undefined,
+    message.variants,
+    "280px",
+  );
   const [revealed, setRevealed] = useState(message.isRevealed || mine);
   const [blushing, setBlushing] = useState(false);
   const blushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,7 +63,7 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
     }
     singleTapTimer.current = setTimeout(() => {
       singleTapTimer.current = null;
-      onOpenImage(message.content);
+      onOpenImage(message.content, message.variants);
     }, 280);
   }
 
@@ -95,7 +100,7 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
           <MusicCard url={message.content} mine={mine} />
         )}
 
-        {isMedia && (
+        {isMedia && media && (
           <div className="relative">
             <button
               type="button"
@@ -113,16 +118,18 @@ export function MessageBubble({ message, mine, onOpenImage }: Props) {
                   : "Mahcup görüntü — dokun"
               }
             >
-              <Image
-                src={message.content}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={media.src}
+                srcSet={media.srcSet || undefined}
+                sizes={media.sizes}
                 alt=""
-                fill
-                sizes="280px"
+                loading="lazy"
+                decoding="async"
                 className={clsx(
-                  "object-cover transition-[filter] duration-500",
+                  "absolute inset-0 w-full h-full object-cover transition-[filter] duration-500",
                   !revealed && "blur-xl scale-110 saturate-[0.85]",
                 )}
-                unoptimized
               />
               {!revealed && (
                 <div className="absolute inset-0 grid place-items-center bg-white/15 backdrop-blur-md">

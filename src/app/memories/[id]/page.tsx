@@ -9,11 +9,11 @@ import {
   updateMemoryPhotos,
   deleteMemory,
 } from "@/lib/memories";
-import { uploadMemoryPhoto } from "@/lib/storage";
+import { uploadMemoryPhotoVariants } from "@/lib/storage";
 import { autoLayout, layoutFitsCount } from "@/lib/collage";
 import { requestCollageExport } from "@/lib/collageExport";
 import { formatMemoryDate } from "@/lib/format";
-import type { CollageLayout, Memory, MemoryPhoto, MemorySong } from "@/lib/types";
+import type { CollageLayout, Memory, MemoryPhoto, MemorySong, PhotoVariants } from "@/lib/types";
 import { Collage } from "@/components/Collage";
 import { CollageTemplatePicker } from "@/components/CollageTemplatePicker";
 import { SongPicker } from "@/components/SongPicker";
@@ -42,7 +42,7 @@ export default function MemoryDetailPage() {
 
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState("");
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -95,7 +95,8 @@ export default function MemoryDetailPage() {
       const added: MemoryPhoto[] = [];
       for (let i = 0; i < files.length; i++) {
         setBusy(`Fotoğraflar yükleniyor… ${i + 1}/${files.length}`);
-        added.push(await uploadMemoryPhoto(user.uid, files[i]));
+        const { url, path, variants } = await uploadMemoryPhotoVariants(user.uid, files[i]);
+        added.push({ url, path, variants });
       }
       setPhotos((prev) => {
         const next = [...prev, ...added].slice(0, 12);
@@ -165,7 +166,7 @@ export default function MemoryDetailPage() {
     setBusy("Kolaj hazırlanıyor…");
     try {
       const url = await requestCollageExport(memory.id);
-      setLightbox(url);
+      setLightbox({ url });
     } catch (e) {
       console.error("[memory] export failed:", e);
       alert("Kolaj oluşturulamadı. Tekrar dene.");
@@ -234,7 +235,10 @@ export default function MemoryDetailPage() {
             <Collage
               photos={memory.photos}
               collage={memory.collage}
-              onCellOpen={(i) => setLightbox(memory.photos[i]?.url ?? null)}
+              onCellOpen={(i) => {
+                const p = memory.photos[i];
+                if (p) setLightbox({ url: p.url, variants: p.variants });
+              }}
             />
             {memory.song && (
               <div className="absolute bottom-3 left-3 right-3 flex">
@@ -430,7 +434,11 @@ export default function MemoryDetailPage() {
         )}
       </div>
 
-      <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
+      <Lightbox
+        url={lightbox?.url ?? null}
+        variants={lightbox?.variants ?? null}
+        onClose={() => setLightbox(null)}
+      />
     </main>
   );
 }
