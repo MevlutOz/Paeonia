@@ -11,7 +11,7 @@ import {
   sendMedia,
   markAllReadFrom,
 } from "@/lib/messages";
-import { uploadDataUrl, uploadPhotoVariants } from "@/lib/storage";
+import { uploadDataUrl, uploadPhotoVariants, uploadVideo } from "@/lib/storage";
 import type { PhotoVariants } from "@/lib/types";
 import { maybeRegisterFcm } from "@/lib/fcm";
 import { useMessages } from "@/lib/hooks/useMessages";
@@ -28,7 +28,12 @@ export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
   const { messages, loading } = useMessages();
   const [canvasOpen, setCanvasOpen] = useState(false);
-  const [lightbox, setLightbox] = useState<{ url: string; variants?: PhotoVariants | null } | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    kind: "image" | "video";
+    url: string;
+    variants?: PhotoVariants | null;
+    poster?: string | null;
+  } | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const fcmAsked = useRef(false);
   const routeReadyFired = useRef(false);
@@ -92,6 +97,19 @@ export default function ChatPage() {
     }
   }
 
+  async function handleVideo(file: File) {
+    if (!user) return;
+    try {
+      const { videoUrl, posterUrl } = await uploadVideo(user.uid, file);
+      await sendMedia(user.uid, videoUrl, "video", null, posterUrl);
+    } catch (e) {
+      console.error("[video] upload failed:", e);
+      const msg =
+        e instanceof Error ? e.message : "Video gönderilemedi. Tekrar dene.";
+      alert(msg);
+    }
+  }
+
   if (!bootChecked) {
     return (
       <main className="min-h-dvh grid place-items-center">
@@ -147,13 +165,19 @@ export default function ChatPage() {
       <MessageList
         messages={messages}
         currentUserId={user.uid}
-        onOpenImage={(url, variants) => setLightbox({ url, variants })}
+        onOpenImage={(url, variants) =>
+          setLightbox({ kind: "image", url, variants })
+        }
+        onOpenVideo={(url, poster) =>
+          setLightbox({ kind: "video", url, poster })
+        }
       />
 
       <MessageInput
         onSend={handleText}
         onOpenCanvas={() => setCanvasOpen(true)}
         onPickPhoto={handlePhoto}
+        onPickVideo={handleVideo}
       />
 
       <CanvasBottomSheet
@@ -166,7 +190,9 @@ export default function ChatPage() {
 
       <Lightbox
         url={lightbox?.url ?? null}
+        kind={lightbox?.kind ?? "image"}
         variants={lightbox?.variants ?? null}
+        poster={lightbox?.poster ?? null}
         onClose={() => setLightbox(null)}
       />
     </main>
