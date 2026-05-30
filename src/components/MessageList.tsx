@@ -8,9 +8,15 @@ interface Props {
   messages: Message[];
   currentUserId: string;
   onOpenImage: (url: string, variants?: PhotoVariants | null) => void;
+  onOpenVideo: (url: string, poster?: string | null) => void;
 }
 
-export function MessageList({ messages, currentUserId, onOpenImage }: Props) {
+export function MessageList({
+  messages,
+  currentUserId,
+  onOpenImage,
+  onOpenVideo,
+}: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export function MessageList({ messages, currentUserId, onOpenImage }: Props) {
           message={m}
           mine={m.senderId === currentUserId}
           onOpenImage={onOpenImage}
+          onOpenVideo={onOpenVideo}
         />
       ))}
       <div ref={endRef} />
