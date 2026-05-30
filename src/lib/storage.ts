@@ -2,6 +2,7 @@
 
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "./firebase";
+import { trace } from "./telemetry/trace";
 import type { PhotoVariants } from "./types";
 
 export type { PhotoVariants };
@@ -144,3 +145,112 @@ export async function uploadMemoryPhotoVariants(
   return { url: variants.full, path: `${base}-full.jpg`, variants };
 }
 
+/**
+ * Extract the first frame of a video file as a JPEG blob using a hidden
+ * <video> element + canvas drawing. Returns null on any failure (caller
+ * uploads the video without a poster — the <video> tag will fall back to
+ * its own default frame).
+ *
+ * Client-side: avoids a Cloud Function + ffmpeg deploy. Works for common
+ * iOS/Android camera codecs (H.264/HEVC); failures fall back gracefully.
+ */
+async function extractVideoPoster(file: File): Promise<Blob | null> {
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = objectUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const onLoaded = () => {
+        video.removeEventListener("error", onError);
+        resolve();
+      };
+      const onError = () => {
+        video.removeEventListener("loadedmetadata", onLoaded);
+        reject(new Error("video metadata load failed"));
+      };
+      video.addEventListener("loadedmetadata", onLoaded, { once: true });
+      video.addEventListener("error", onError, { once: true });
+    });
+
+    // Bazı tarayıcılarda 0 saniyede frame henüz hazır değil — 0.1s daha güvenilir.
+    video.currentTime = Math.min(0.1, (video.duration || 1) * 0.05);
+
+    await new Promise<void>((resolve, reject) => {
+      const onSeeked = () => {
+        video.removeEventListener("error", onError);
+        resolve();
+      };
+      const onError = () => {
+        video.removeEventListener("seeked", onSeeked);
+        reject(new Error("video seek failed"));
+      };
+      video.addEventListener("seeked", onSeeked, { once: true });
+      video.addEventListener("error", onError, { once: true });
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82);
+    });
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+    video.src = "";
+  }
+}
+
+const MAX_VIDEO_MB = 25;
+
+/**
+ * Upload a video file (chat) under /videos/{uid}/. Extracts the first frame
+ * as a poster JPEG client-side and uploads both in parallel.
+ *
+ * Throws on validation failure (not a video MIME, or size > 25 MB) so the
+ * caller can show a user-facing alert.
+ */
+export async function uploadVideo(
+  uid: string,
+  file: File,
+): Promise<{ videoUrl: string; posterUrl: string | null }> {
+  if (!file.type.startsWith("video/")) {
+    throw new Error("Sadece video dosyaları yüklenebilir.");
+  }
+  if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+    throw new Error(`Video ${MAX_VIDEO_MB} MB'tan büyük olamaz.`);
+  }
+
+  return trace(
+    "video.upload",
+    async () => {
+      const ext =
+        file.name.match(/\.([a-zA-Z0-9]+)$/)?.[1]?.toLowerCase() ?? "mp4";
+      const base = `videos/${uid}/${Date.now()}-${cryptoId()}`;
+
+      const posterBlob = await extractVideoPoster(file);
+
+      const videoUploadP = uploadAt(`${base}.${ext}`, file);
+      const posterUploadP = posterBlob
+        ? uploadAt(`${base}-poster.jpg`, posterBlob)
+        : Promise.resolve<string | null>(null);
+
+      const [videoUrl, posterUrl] = await Promise.all([
+        videoUploadP,
+        posterUploadP,
+      ]);
+
+      return { videoUrl, posterUrl };
+    },
+    { sizeKb: String(Math.round(file.size / 1024)) },
+  );
+}
