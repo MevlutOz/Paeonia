@@ -97,3 +97,41 @@ export function useMessages(): UseMessagesState & {
 
   return { ...state, loadMore, markVisibleAsRead };
 }
+
+/**
+ * Prewarm the messages subscription without rendering. Returns the registry
+ * unsubscribe. Call this from /home's idle callback to keep the registry
+ * warm for /chat's first paint — the 30s grace window in subscriptionRegistry
+ * means /home → /chat hits a cached snapshot.
+ */
+export function prewarmMessages(): () => void {
+  return subscribeShared<SharedState>(
+    KEY,
+    (push) => {
+      const local: SharedState = {
+        messages: new Map(),
+        hasMore: true,
+        loadMore: async () => 0,
+      };
+      const { unsubscribe: u, loadMore } = subscribeMessagesPaginated((delta, initial) => {
+        delta.added.forEach((m) => local.messages.set(m.id, m));
+        delta.modified.forEach((m) => local.messages.set(m.id, m));
+        delta.removed.forEach((id) => local.messages.delete(id));
+        if (initial && delta.added.length < PAGE_SIZE) local.hasMore = false;
+        push({ ...local, messages: new Map(local.messages) });
+      }, PAGE_SIZE);
+      local.loadMore = async () => {
+        const got = await loadMore();
+        if (got < PAGE_SIZE) {
+          local.hasMore = false;
+          push({ ...local, messages: new Map(local.messages) });
+        }
+        return got;
+      };
+      return u;
+    },
+    () => {
+      // no-op listener: we just want the subscription warm in the registry
+    },
+  );
+}

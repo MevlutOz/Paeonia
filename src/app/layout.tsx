@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Quicksand } from "next/font/google";
 import "./globals.css";
-import { SpotifyPlayerProvider } from "@/lib/SpotifyPlayerProvider";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 import { TelemetryBoot } from "./_telemetryBoot";
@@ -49,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" className={`${playfair.variable} ${quicksand.variable}`}>
       <body className="min-h-dvh">
         <TelemetryBoot />
-        <SpotifyPlayerProvider>{children}</SpotifyPlayerProvider>
+        {children}
         <SpeedInsights />
         <Analytics />
       </body>

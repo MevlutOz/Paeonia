@@ -11,6 +11,7 @@ import {
   updatePlan,
   deletePlan,
 } from "@/lib/plans";
+import { reportRouteReady } from "@/lib/telemetry/events";
 import type { Plan } from "@/lib/types";
 import { PeonyIcon } from "@/components/PeonyIcon";
 
@@ -133,6 +134,10 @@ export default function PlansPage() {
     });
     return () => unsub();
   }, [user]);
+
+  useEffect(() => {
+    if (loaded) reportRouteReady("plans");
+  }, [loaded]);
 
   const { pending, done } = useMemo(() => {
     return {

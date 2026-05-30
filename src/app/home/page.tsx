@@ -6,6 +6,8 @@ import Link from "next/link";
 import type { User } from "firebase/auth";
 import { onUser, signOut } from "@/lib/auth";
 import { isAllowedUid } from "@/lib/firebase";
+import { prewarmMessages } from "@/lib/hooks/useMessages";
+import { reportRouteReady } from "@/lib/telemetry/events";
 import { PeonyIcon } from "@/components/PeonyIcon";
 
 export default function HomePage() {
@@ -24,6 +26,31 @@ export default function HomePage() {
     });
     return () => unsub();
   }, [router]);
+
+  useEffect(() => {
+    reportRouteReady("home");
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const idle = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    let unsubscribe: (() => void) | null = null;
+    const run = () => {
+      unsubscribe = prewarmMessages();
+    };
+    if (typeof idle === "function") {
+      idle(run, { timeout: 3000 });
+    } else {
+      setTimeout(run, 1500);
+    }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [user]);
 
   if (!checked) {
     return (
