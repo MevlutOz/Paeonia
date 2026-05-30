@@ -8,12 +8,23 @@ import { PeonyIcon } from "./PeonyIcon";
 
 interface Props {
   url: string | null;
+  kind?: "image" | "video";
   variants?: PhotoVariants | null;
+  poster?: string | null;
   onClose: () => void;
 }
 
-export function Lightbox({ url, variants, onClose }: Props) {
-  const media = useMedia(url ?? undefined, variants);
+export function Lightbox({
+  url,
+  kind = "image",
+  variants,
+  poster,
+  onClose,
+}: Props) {
+  const media = useMedia(
+    kind === "image" ? (url ?? undefined) : undefined,
+    variants,
+  );
 
   useEffect(() => {
     if (!url) return;
@@ -28,9 +39,11 @@ export function Lightbox({ url, variants, onClose }: Props) {
     };
   }, [url, onClose]);
 
+  const isOpen = !!url && (kind === "video" || !!media);
+
   return (
     <AnimatePresence>
-      {url && media && (
+      {isOpen && (
         <motion.div
           className="fixed inset-0 z-[60] grid place-items-center p-4 bg-aphrodite-dark/85 backdrop-blur-md"
           initial={{ opacity: 0 }}
@@ -63,12 +76,23 @@ export function Lightbox({ url, variants, onClose }: Props) {
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={media.fullSrc}
-              alt=""
-              className="max-w-[94vw] max-h-[82vh] object-contain rounded-3xl shadow-blush"
-            />
+            {kind === "video" ? (
+              <video
+                src={url ?? undefined}
+                poster={poster ?? undefined}
+                controls
+                autoPlay
+                playsInline
+                className="max-w-[94vw] max-h-[82vh] rounded-3xl shadow-blush bg-black"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={media!.fullSrc}
+                alt=""
+                className="max-w-[94vw] max-h-[82vh] object-contain rounded-3xl shadow-blush"
+              />
+            )}
           </motion.div>
 
           <div className="absolute bottom-[max(env(safe-area-inset-bottom),20px)] left-0 right-0 flex justify-center">

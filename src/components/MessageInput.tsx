@@ -7,13 +7,20 @@ interface Props {
   onSend: (text: string) => void | Promise<void>;
   onOpenCanvas: () => void;
   onPickPhoto: (file: File) => void | Promise<void>;
+  onPickVideo: (file: File) => void | Promise<void>;
 }
 
-export function MessageInput({ onSend, onOpenCanvas, onPickPhoto }: Props) {
+export function MessageInput({
+  onSend,
+  onOpenCanvas,
+  onPickPhoto,
+  onPickVideo,
+}: Props) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -31,12 +38,16 @@ export function MessageInput({ onSend, onOpenCanvas, onPickPhoto }: Props) {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || photoBusy) return;
-    setPhotoBusy(true);
+    if (!file || mediaBusy) return;
+    setMediaBusy(true);
     try {
-      await onPickPhoto(file);
+      if (file.type.startsWith("video/")) {
+        await onPickVideo(file);
+      } else {
+        await onPickPhoto(file);
+      }
     } finally {
-      setPhotoBusy(false);
+      setMediaBusy(false);
     }
   }
 
@@ -46,9 +57,17 @@ export function MessageInput({ onSend, onOpenCanvas, onPickPhoto }: Props) {
       className="px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 bg-gradient-to-t from-nymph-bg via-nymph-bg/95 to-transparent"
     >
       <input
-        ref={fileRef}
+        ref={galleryRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={handleFile}
+      />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*,video/*"
+        capture="environment"
         className="hidden"
         onChange={handleFile}
       />
@@ -56,23 +75,47 @@ export function MessageInput({ onSend, onOpenCanvas, onPickPhoto }: Props) {
       <div className="flex items-end gap-2">
         <button
           type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={photoBusy}
-          aria-label="Fotoğraf gönder"
+          onClick={() => cameraRef.current?.click()}
+          disabled={mediaBusy}
+          aria-label="Kameradan çek"
           className="h-11 w-11 grid place-items-center rounded-full bg-white/80 border border-peony-light/50 text-peony-default shadow-petal active:scale-95 transition disabled:opacity-50"
         >
-          {photoBusy ? (
+          {mediaBusy ? (
             <span className="animate-sway">
               <PeonyIcon size={20} glow />
             </span>
           ) : (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path
-                d="M4 5h3l1.5-2h7L18 5h3a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm8 4a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"
+                d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm8 3a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"
                 fill="currentColor"
               />
+              <circle cx="18.5" cy="9.5" r="1" fill="currentColor" />
             </svg>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => galleryRef.current?.click()}
+          disabled={mediaBusy}
+          aria-label="Galeriden foto veya video seç"
+          className="h-11 w-11 grid place-items-center rounded-full bg-white/80 border border-peony-light/50 text-peony-default shadow-petal active:scale-95 transition disabled:opacity-50"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 4h14a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-3l-2 3-2-3H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 5h8M8 12h6"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d="M9 6h6v2H9zM6 10h2v2H6zm10 2h2v2h-2z"
+              fill="currentColor"
+              opacity="0.3"
+            />
+          </svg>
         </button>
 
         <button

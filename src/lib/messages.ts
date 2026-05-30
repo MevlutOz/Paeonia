@@ -69,17 +69,20 @@ export async function sendText(senderId: string, text: string) {
 export async function sendMedia(
   senderId: string,
   url: string,
-  type: "drawing" | "photo",
+  type: "drawing" | "photo" | "video",
   variants?: PhotoVariants | null,
+  poster?: string | null,
 ) {
   await addDoc(collection(firestore(), MESSAGES), {
     senderId,
     type,
     content: url,
     ...(variants ? { variants } : {}),
+    ...(poster ? { poster } : {}),
     createdAt: serverTimestamp(),
     isRead: false,
-    isRevealed: false,
+    // Videolar reveal pattern kullanmaz — alıcı tarafta direkt görünür.
+    isRevealed: type === "video",
     isFavorited: false,
   });
 }
@@ -124,6 +127,7 @@ function docToMessage(d: QueryDocumentSnapshot | DocumentSnapshot): Message {
     type: (data?.type as MessageType) ?? "text",
     content: (data?.content as string) ?? "",
     variants: (data?.variants as PhotoVariants | undefined) ?? null,
+    poster: (data?.poster as string | undefined) ?? null,
     createdAt: (data?.createdAt as Message["createdAt"]) ?? null,
     isRead: !!data?.isRead,
     isRevealed: !!data?.isRevealed,
